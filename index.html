@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            alert("자바스크립트 런타임 오류 발생!\n메시지: " + message + "\n파일: " + source + "\n라인: " + lineno + "\n컬럼: " + colno);
+            return false;
+        };
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hard Carbon Electrochemical Analyzer</title>
+    <!-- Google Fonts & Material Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <!-- Chart.js CDN & SheetJS (Excel Parser) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css?v=2.7.0">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="material-icons-round brand-icon">battery_charging_full</span>
+                <div class="brand-title">
+                    <h1>HC-Analyzer</h1>
+                    <span class="version-tag">v1.0.0 (MVP)</span>
+                </div>
+            </div>
+            
+            <p class="sidebar-subtitle">배터리 논문 투고용 전기화학 데이터 정제 시스템</p>
+
+            <!-- 메인 분석 모드 스위처 -->
+            <div class="mode-switcher-container">
+                <div class="mode-switcher">
+                    <button class="mode-btn active" id="btnModeGeneral">
+                        <span class="material-icons-round" style="font-size: 14px;">battery_charging_full</span> 일반 분석
+                    </button>
+                    <button class="mode-btn" id="btnModeGitt">
+                        <span class="material-icons-round" style="font-size: 14px;">insights</span> GITT 분석
+                    </button>
+                </div>
+            </div>
+
+            <!-- File Upload Card -->
+            <div class="sidebar-card upload-card">
+                <h2 class="card-title"><span class="material-icons-round icon-align">upload_file</span> 데이터 업로드</h2>
+                <div class="drop-zone" id="dropZone">
+                    <span class="material-icons-round drop-icon">cloud_upload</span>
+                    <p class="drop-text">CSV, TXT 또는 Excel 파일을 여기에 드래그하거나 클릭하여 업로드하세요.</p>
+                    <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" hidden>
+                </div>
+                <div class="demo-divider">또는</div>
+                <button class="btn btn-secondary btn-full" id="btnDemoData" style="margin-bottom: 8px;">
+                    <span class="material-icons-round">analytics</span> 데모 데이터 로드
+                </button>
+                <button class="btn btn-secondary btn-full" id="btnGittDemoData">
+                    <span class="material-icons-round">insights</span> GITT 데모 로드
+                </button>
+                
+                <!-- 율속 테스트 설정 패널 -->
+                <div class="rate-config-panel" id="rateConfigPanel" style="margin-top: 18px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 14px;">
+                    <p class="rate-config-title" style="font-size: 11px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 10px;">⚡ 율속 분석 설정</p>
+
+                    <!-- 단위 선택 (C-rate vs mA/g) -->
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 11px; color: var(--text-muted); font-weight: 500; display: block; margin-bottom: 6px;">측정 단위</label>
+                        <div class="rate-unit-toggle" id="rateUnitToggle">
+                            <button class="rate-unit-btn active" data-unit="crate" id="btnUnitCrate">C-rate</button>
+                            <button class="rate-unit-btn" data-unit="mag" id="btnUnitMag">mA/g</button>
+                        </div>
+                    </div>
+
+                    <!-- 단계당 사이클 수 -->
+                    <div style="margin-bottom: 10px;">
+                        <label class="config-label" for="rateStepSize" style="margin-bottom: 6px; display: block; font-size: 11px; color: var(--text-muted); font-weight: 500;">단계당 사이클 수</label>
+                        <select id="rateStepSize" class="select-field">
+                            <option value="3">3 사이클</option>
+                            <option value="5" selected>5 사이클 (표준)</option>
+                            <option value="10">10 사이클</option>
+                        </select>
+                    </div>
+
+                    <!-- 단계 라벨 직접 입력 -->
+                    <div>
+                        <label class="config-label" for="rateStepsInput" style="margin-bottom: 6px; display: block; font-size: 11px; color: var(--text-muted); font-weight: 500;">
+                            <span id="rateStepsLabel">단계별 C-rate 값</span> <span style="color: var(--color-accent); font-size: 9px;">(쉼표 구분)</span>
+                        </label>
+                        <input type="text" id="rateStepsInput" class="select-field"
+                            value="0.1, 0.2, 0.5, 1, 2, 5, 10, 0.1"
+                            placeholder="예: 0.1, 0.2, 0.5, 1, 2..."
+                            style="padding: 8px 10px; height: auto; font-size: 11px;">
+                        <span style="margin-top: 4px; display: block; font-size: 9px; color: var(--text-muted);">
+                            각 율속 단계의 값을 순서대로 입력 (숫자만)
+                        </span>
+                    </div>
+                </div>
+
+                <!-- GITT 분석 설정 패널 -->
+                <div class="gitt-config-panel" id="gittConfigPanel" style="margin-top: 18px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 14px; display: none;">
+                    <p class="gitt-config-title" style="font-size: 11px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 10px;">🧪 GITT 분석 설정</p>
+                    
+                    <!-- 활물질 질량 (m_B) -->
+                    <div style="margin-bottom: 10px;">
+                        <label class="config-label" for="gittMass" style="margin-bottom: 6px; display: block; font-size: 11px; color: var(--text-muted); font-weight: 500;">활물질 질량 (m<sub>B</sub>, mg)</label>
+                        <input type="number" id="gittMass" class="select-field" value="1.033" step="0.001" min="0.001" style="padding: 8px 10px; height: auto; font-size: 11px;">
+                    </div>
+                    
+                    <!-- 전극 단면적 (A) -->
+                    <div style="margin-bottom: 10px;">
+                        <label class="config-label" for="gittArea" style="margin-bottom: 6px; display: block; font-size: 11px; color: var(--text-muted); font-weight: 500;">전극 면적 (A, cm<sup>2</sup>)</label>
+                        <input type="number" id="gittArea" class="select-field" value="1.54" step="0.01" min="0.01" style="padding: 8px 10px; height: auto; font-size: 11px;">
+                    </div>
+                    
+                    <!-- 몰 부피 (V_M) -->
+                    <div style="margin-bottom: 10px;">
+                        <label class="config-label" for="gittVol" style="margin-bottom: 6px; display: block; font-size: 11px; color: var(--text-muted); font-weight: 500;">몰 부피 (V<sub>M</sub>, cm<sup>3</sup>/mol)</label>
+                        <input type="number" id="gittVol" class="select-field" value="9.38" step="0.01" min="0.01" style="padding: 8px 10px; height: auto; font-size: 11px;">
+                    </div>
+                    
+                    <!-- 몰 질량 (M_B) -->
+                    <div style="margin-bottom: 10px;">
+                        <label class="config-label" for="gittMolarMass" style="margin-bottom: 6px; display: block; font-size: 11px; color: var(--text-muted); font-weight: 500;">몰 질량 (M<sub>B</sub>, g/mol)</label>
+                        <input type="number" id="gittMolarMass" class="select-field" value="12.011" step="0.001" min="0.1" style="padding: 8px 10px; height: auto; font-size: 11px;">
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Configuration Card (Hidden from UI but kept in DOM to prevent JS errors) -->
+            <div class="sidebar-card config-card disabled" id="configCard" style="display: none;">
+                <h2 class="card-title"><span class="material-icons-round icon-align">settings</span> 분석 설정</h2>
+                
+                <!-- Column Mapping -->
+                <div class="config-group">
+                    <label class="config-label">칼럼 매핑 (Column Mapping)</label>
+                    <div class="mapping-grid">
+                        <div class="mapping-item">
+                            <span class="mapping-tag">사이클</span>
+                            <select id="mapCycle" class="select-field"></select>
+                        </div>
+                        <div class="mapping-item">
+                            <span class="mapping-tag">전압 (V)</span>
+                            <select id="mapVoltage" class="select-field"></select>
+                        </div>
+                        <div class="mapping-item">
+                            <span class="mapping-tag">용량 (mAh/g)</span>
+                            <select id="mapCapacity" class="select-field"></select>
+                        </div>
+                        <div class="mapping-item">
+                            <span class="mapping-tag">전류 (mA)</span>
+                            <select id="mapCurrent" class="select-field"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cut-off Voltage Slider -->
+                <div class="config-group">
+                    <div class="label-with-value">
+                        <label class="config-label" for="cutoffVoltageSidebar">Plateau 분리 전압 (Cut-off)</label>
+                        <span class="value-display" id="cutoffValDisplaySidebar">0.10 V</span>
+                    </div>
+                    <input type="range" id="cutoffVoltageSidebar" min="0.02" max="0.30" step="0.01" value="0.10" class="range-slider">
+                    <span class="input-desc">이 전압 이하의 영역을 평탄(Plateau) 영역으로 계산합니다.</span>
+                </div>
+
+                <!-- Analysis Target Cycle -->
+                <div class="config-group">
+                    <label class="config-label" for="targetCycleSidebar">분석 대상 사이클</label>
+                    <select id="targetCycleSidebar" class="select-field">
+                        <option value="1">1 Cycle</option>
+                    </select>
+                </div>
+
+                <!-- C-rate Step Size -->
+                <div class="config-group">
+                    <label class="config-label" for="rateStepSizeSidebar">C-rate 분석 단위</label>
+                    <select id="rateStepSizeSidebar" class="select-field">
+                        <option value="auto" selected>자동 감지</option>
+                        <option value="3">3 사이클 단위</option>
+                        <option value="5">5 사이클 단위</option>
+                        <option value="10">10 사이클 단위</option>
+                    </select>
+                    <span class="input-desc">각 C-rate 단계당 수행된 사이클 수입니다.</span>
+                </div>
+            </div>
+            
+            <!-- 데이터 라이브러리 패널 -->
+            <div class="sidebar-card library-card" id="datasetLibraryCard">
+                <div class="library-card-header">
+                    <h2 class="card-title" style="margin: 0;">
+                        <span class="material-icons-round icon-align">dataset</span>
+                        데이터 라이브러리
+                    </h2>
+                    <span class="library-count-badge" id="libraryCountBadge">0</span>
+                </div>
+                <p style="font-size: 10px; color: var(--text-muted); margin: 6px 0 10px; line-height: 1.4;">
+                    저장된 데이터를 체크하면 모든 탭에서 비교 오버레이됩니다.
+                </p>
+                <div class="dataset-list" id="datasetList">
+                    <p class="library-empty-msg">업로드한 데이터가 여기에 저장됩니다.</p>
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <p>&copy; 2026 Antigravity. 배터리 소자 전공 교수 감수.</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Navbar / Info Header -->
+            <header class="main-header">
+                <div class="header-info">
+                    <span class="badge badge-success">READY</span>
+                    <h2 class="active-filename" id="activeFilename">분석할 데이터를 업로드해 주세요</h2>
+                </div>
+                <div class="header-tabs">
+                    <button class="tab-btn active" data-tab="tab-overview">
+                        <span class="material-icons-round">dashboard</span> 개요 & ICE
+                    </button>
+                    <button class="tab-btn" data-tab="tab-slope-plateau">
+                        <span class="material-icons-round">show_chart</span> Slope / Plateau
+                    </button>
+                    <button class="tab-btn" data-tab="tab-rate">
+                        <span class="material-icons-round">speed</span> Rate Capability
+                    </button>
+                    <button class="tab-btn" data-tab="tab-dqdv">
+                        <span class="material-icons-round">waves</span> dQ/dV 분석
+                    </button>
+                    <button class="tab-btn" data-tab="tab-gitt">
+                        <span class="material-icons-round">insights</span> GITT 분석
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Content Panels -->
+            <div class="content-body">
+                <!-- Welcome View (when no data loaded) -->
+                <div class="welcome-view" id="welcomeView">
+                    <div class="welcome-card">
+                        <span class="material-icons-round welcome-icon animate-pulse" id="welcomeIcon">query_stats</span>
+                        <h2 id="welcomeTitle">하드카본 전기화학 데이터 분석기</h2>
+                        <p id="welcomeDesc">하드카본의 고유한 거동인 <strong>Slope (경사)</strong> 영역과 <strong>Plateau (평탄)</strong> 영역의 가역 용량을 완벽하게 구분하여 분석합니다.<br>
+                        초기 가역 효율(ICE)과 율속 특성(Rate Capability) 데이터를 자동으로 파싱하여 논문 투고용 차트로 가시화해 줍니다.</p>
+                        <div class="welcome-actions">
+                            <button class="btn btn-primary" id="btnWelcomeDemo">
+                                <span class="material-icons-round" id="welcomeDemoBtnIcon">bolt</span> <span id="welcomeDemoBtnText">데모 데이터로 즉시 시작하기</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 1: Overview & ICE -->
+                <div class="tab-panel active" id="tab-overview">
+                    <div class="chart-layout-grid single-chart">
+                        <div class="dashboard-chart-card">
+                            <div class="card-header">
+                                <h3 class="chart-title">전압 프로파일 (Voltage Profile)</h3>
+                                <div class="header-controls">
+                                    <div class="control-item">
+                                        <label for="targetCycle">분석 사이클:</label>
+                                        <select id="targetCycle" class="select-field inline-select">
+                                            <option value="1">1 Cycle</option>
+                                        </select>
+                                    </div>
+                                    <button class="btn-icon" title="데이터 다운로드" id="btnDownloadProfile"><span class="material-icons-round">download</span></button>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chartProfile"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- 초기 용량 및 ICE 정량 비교 요약 테이블 -->
+                        <div class="dashboard-chart-card table-card" style="margin-top: 10px;">
+                            <div class="card-header">
+                                <h3 class="chart-title">초기 전기화학 특성 비교 요약 (Initial Capacity & ICE)</h3>
+                            </div>
+                            <div class="table-container">
+                                <table class="academic-table" id="tableOverviewMetrics">
+                                    <thead>
+                                        <tr>
+                                            <th>데이터셋</th>
+                                            <th>초기 소듐화 용량 (Discharge, mAh/g)</th>
+                                            <th>초기 탈소듐 용량 (Charge, mAh/g)</th>
+                                            <th>초기 가역 효율 (ICE, %)</th>
+                                            <th>교수진 디스커션 가이드</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="5" style="text-align: center; color: var(--text-muted);">데이터가 없습니다. CSV를 업로드하거나 데모 데이터를 실행해 주십시오.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Slope / Plateau Analysis -->
+                <div class="tab-panel" id="tab-slope-plateau">
+                    <div class="chart-layout-grid single-chart">
+                        <!-- Chart Area -->
+                        <div class="dashboard-chart-card">
+                            <div class="card-header">
+                                <h3 class="chart-title">Slope / Plateau 영역 하이라이트</h3>
+                                <div class="header-controls">
+                                    <div class="control-item">
+                                        <label for="targetCycleSP">분석 사이클:</label>
+                                        <select id="targetCycleSP" class="select-field inline-select">
+                                            <option value="1">1 Cycle</option>
+                                        </select>
+                                    </div>
+                                    <div class="control-item slider-item">
+                                        <label for="cutoffVoltage">Plateau 분리 전압:</label>
+                                        <input type="range" id="cutoffVoltage" min="0.02" max="0.30" step="0.01" value="0.10" class="range-slider inline-slider">
+                                        <span class="value-display" id="cutoffValDisplay">0.10 V</span>
+                                    </div>
+                                    <button class="btn-icon" title="차트 이미지 저장" id="btnDownloadSlopeChart"><span class="material-icons-round">photo_camera</span></button>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chartSlopePlateau"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Slope / Plateau 정량 분석 비교 요약 테이블 -->
+                        <div class="dashboard-chart-card table-card" style="margin-top: 10px;">
+                            <div class="card-header">
+                                <h3 class="chart-title">Slope / Plateau 정량 분석 비교 요약</h3>
+                            </div>
+                            <div class="table-container">
+                                <table class="academic-table" id="tableSlopePlateauMetrics">
+                                    <thead>
+                                        <tr>
+                                            <th>데이터셋</th>
+                                            <th>분석 사이클</th>
+                                            <th>Slope 영역 용량 (mAh/g)</th>
+                                            <th>Slope 분율 (%)</th>
+                                            <th>Plateau 영역 용량 (mAh/g)</th>
+                                            <th>Plateau 분율 (%)</th>
+                                            <th>총 방전 용량 (mAh/g)</th>
+                                            <th>교수진 디스커션 가이드</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="8" style="text-align: center; color: var(--text-muted);">데이터가 없습니다. CSV를 업로드하거나 데모 데이터를 실행해 주십시오.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="card-footer-note">
+                                <span class="material-icons-round">info</span> 
+                                일반적으로 탄화 온도가 높아질수록 Plateau 영역의 기공 내 Na 클러스터링 용량이 지배적으로 증가하며, Slope 영역은 감소하는 경향을 보입니다.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Rate Capability -->
+                <div class="tab-panel" id="tab-rate">
+                    <div class="chart-layout-grid two-columns">
+                        <!-- Rate capacity line chart over cycles -->
+                        <div class="dashboard-chart-card">
+                            <div class="card-header">
+                                <h3 class="chart-title" id="rateCyclesChartTitle">사이클 경과에 따른 C-rate별 충전 용량</h3>
+                                <div class="header-controls">
+                                    <div class="control-item">
+                                        <label for="selectRateMode">율속 기준:</label>
+                                        <select id="selectRateMode" class="select-field inline-select">
+                                            <option value="charge" selected>충전 용량 기준 (Charge)</option>
+                                            <option value="discharge">방전 용량 기준 (Discharge)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chartRateCycles"></canvas>
+                            </div>
+                        </div>
+ 
+                        <!-- Rate retention summary bar chart -->
+                        <div class="dashboard-chart-card">
+                            <div class="card-header">
+                                <h3 class="chart-title" id="rateSummaryChartTitle">C-rate별 용량 유지율 (0.1C 기준)</h3>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chartRateSummary"></canvas>
+                            </div>
+                        </div>
+                    </div>
+ 
+                    <!-- Rate Summary Table -->
+                    <div class="dashboard-chart-card table-card">
+                        <div class="card-header">
+                            <h3 class="chart-title">C-rate 율속 데이터 요약</h3>
+                            <div class="header-controls">
+                                <button class="btn btn-secondary btn-sm" id="btnDownloadRateData">
+                                    <span class="material-icons-round">download</span> CSV 내보내기
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="academic-table" id="tableRateSummary">
+                                <thead>
+                                    <!-- 자바스크립트에서 동적으로 헤더 컬럼 빌드 -->
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="text-align: center; color: var(--text-muted);">데이터가 없습니다. CSV를 업로드하거나 데모 데이터를 실행해 주십시오.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 4: dQ/dV Analysis -->
+                <div class="tab-panel" id="tab-dqdv">
+                    <div class="chart-layout-grid single-chart">
+                        <!-- Chart Area -->
+                        <div class="dashboard-chart-card">
+                            <div class="card-header">
+                                <h3 class="chart-title">dQ/dV 미분 용량 곡선</h3>
+                                <div class="header-controls">
+                                     <!-- 기존 targetCycleDqDv 셀렉터는 호환성을 위해 display:none 상태로 남겨둠 -->
+                                     <select id="targetCycleDqDv" style="display: none;">
+                                         <option value="1">1 Cycle</option>
+                                     </select>
+                                     <div class="control-item" style="flex: 1; min-width: 250px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                                         <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
+                                             <label style="font-weight: 600; font-size: 11px; color: var(--text-muted);">분석 사이클 선택:</label>
+                                             <div class="cycle-quick-actions" id="cycleQuickActions">
+                                                 <button class="btn btn-secondary btn-xs" id="btnCycleAll">전체</button>
+                                                 <button class="btn btn-secondary btn-xs" id="btnCycleClear">해제</button>
+                                                 <button class="btn btn-secondary btn-xs" id="btnCycleOdd">홀수</button>
+                                                 <button class="btn btn-secondary btn-xs" id="btnCycleEven">짝수</button>
+                                             </div>
+                                         </div>
+                                         <div class="cycle-chips-container" id="cycleChipsContainer">
+                                             <!-- JS 동적 생성 영역 -->
+                                         </div>
+                                     </div>
+                                    <div class="control-item">
+                                        <label for="selectDqDvMode">충방전 모드:</label>
+                                        <select id="selectDqDvMode" class="select-field inline-select">
+                                            <option value="both" selected>충방전 전체 (Both)</option>
+                                            <option value="charge">충전만 (Desodiation)</option>
+                                            <option value="discharge">방전만 (Sodiation)</option>
+                                        </select>
+                                    </div>
+                                    <div class="control-item slider-item" style="min-width: 150px;">
+                                        <label for="dqdvStepV">dV [V]:</label>
+                                        <input type="range" id="dqdvStepV" min="0.001" max="0.030" step="0.001" value="0.010" class="range-slider inline-slider">
+                                        <span class="value-display" id="dqdvStepVVal">10 mV</span>
+                                    </div>
+                                    <div class="control-item">
+                                        <label for="dqdvQo">Qo [mAh]:</label>
+                                        <input type="number" id="dqdvQo" class="select-field inline-select" style="width: 70px; padding: 4px;" value="1000">
+                                    </div>
+                                    <div class="control-item">
+                                        <label for="dqdvMass">Mass [mg]:</label>
+                                        <input type="number" id="dqdvMass" class="select-field inline-select" style="width: 70px; padding: 4px;" value="2.58" step="0.01">
+                                    </div>
+                                    <div class="control-item" style="min-width: 130px;">
+                                        <label for="dqdvPostAvg">Post-Avg. Factor:</label>
+                                        <input type="number" id="dqdvPostAvg" class="select-field inline-select" style="width: 50px; padding: 4px;" value="1" min="1" max="30">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chartDqDv"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- dQ/dV Peak Summary Table -->
+                        <div class="dashboard-chart-card table-card" style="margin-top: 10px;">
+                            <div class="card-header">
+                                <h3 class="chart-title">주요 산화환원 피크 요약</h3>
+                            </div>
+                            <div class="table-container">
+                                <table class="academic-table" id="tableDqDvPeaks">
+                                    <thead>
+                                        <tr>
+                                            <th>데이터셋</th>
+                                            <th>분석 사이클</th>
+                                            <th>최대 환원 피크 전압 (Discharge Peak, V)</th>
+                                            <th>최대 환원 피크 강도 (1/Qo * dQ/dV, 1/V)</th>
+                                            <th>최대 산화 피크 전압 (Charge Peak, V)</th>
+                                            <th>최대 산화 피크 강도 (1/Qo * dQ/dV, 1/V)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="6" style="text-align: center; color: var(--text-muted);">데이터가 없습니다. CSV를 업로드하거나 데모 데이터를 실행해 주십시오.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 5: GITT Analysis -->
+                <div class="tab-panel" id="tab-gitt">
+                    <!-- GITT 분석 대상 회차 선택 컨트롤 바 -->
+                    <div class="gitt-control-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 20px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); backdrop-filter: blur(10px); flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="material-icons-round" style="color: var(--color-accent); font-size: 20px;">layers</span>
+                            <span style="font-size: 13px; font-weight: 600; color: var(--text-main); font-family: 'Outfit', sans-serif;">GITT 분석 사이클 회차 선택</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <label for="gittDischargeCycle" style="font-size: 11px; color: var(--text-muted); font-weight: 500; white-space: nowrap;">방전 회차:</label>
+                                <select id="gittDischargeCycle" class="select-field" style="padding: 6px 12px; height: 34px; font-size: 11px; width: 180px; background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); border-radius: 6px;">
+                                    <option value="0">1회차 (기본)</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <label for="gittChargeCycle" style="font-size: 11px; color: var(--text-muted); font-weight: 500; white-space: nowrap;">충전 회차:</label>
+                                <select id="gittChargeCycle" class="select-field" style="padding: 6px 12px; height: 34px; font-size: 11px; width: 180px; background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); border-radius: 6px;">
+                                    <option value="0">1회차 (기본)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-layout-grid">
+                        <!-- GITT Voltage vs. Time Chart -->
+                        <div class="dashboard-chart-card">
+                            <div class="card-header">
+                                <h3 class="chart-title">GITT 전압 프로파일 (Voltage vs. Time)</h3>
+                                <div class="header-controls">
+                                    <div class="control-item">
+                                        <span class="badge badge-info">방전: Step 2,3</span>
+                                        <span class="badge badge-success" style="margin-left: 4px;">충전: Step 4,5</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chartGittProfile"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- GITT Voltage vs. Capacity Chart -->
+                        <div class="dashboard-chart-card">
+                            <div class="card-header">
+                                <h3 class="chart-title">GITT 전압 프로파일 (Voltage vs. Capacity)</h3>
+                                <div class="header-controls">
+                                    <div class="control-item">
+                                        <span class="badge badge-info">방전: Step 2,3</span>
+                                        <span class="badge badge-success" style="margin-left: 4px;">충전: Step 4,5</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chartGittProfileCapacity"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 이온 확산 계수 수동 계산 제어 및 결과 대시보드 영역 -->
+                    <div class="gitt-calc-section" style="margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); backdrop-filter: blur(10px);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 14px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="material-icons-round" style="color: var(--color-accent); font-size: 22px;">calculate</span>
+                                <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text-main); font-family: 'Outfit', sans-serif;">이온 확산 계수 (D) 분석</h3>
+                            </div>
+                            <!-- 계산 버튼 -->
+                            <button class="btn btn-primary" id="btnCalculateGittDiffusion" style="padding: 8px 16px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                                <span class="material-icons-round" style="font-size: 18px;">play_arrow</span> 이온 확산 계수 계산
+                            </button>
+                        </div>
+                        <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 16px 0; line-height: 1.5;">
+                            좌측 사이드바의 <strong>GITT 분석 설정</strong>(활물질 질량, 전극 면적, 몰 부피, 몰 질량) 값을 입력한 뒤 위 버튼을 클릭하면 이온 확산 계수($D$)가 즉시 산출되며, 분석 그래프와 수치 테이블이 활성화됩니다.
+                        </p>
+                        
+                        <!-- 계산 완료 후 노출될 결과 영역 (차트 + 테이블 2컬럼 레이아웃) -->
+                        <div class="chart-layout-grid" id="gittCalcResultsArea" style="display: none; margin-top: 10px;">
+                            <!-- Left: Diffusion Coefficient Chart -->
+                            <div class="dashboard-chart-card" style="margin: 0; border: none; background: transparent; padding: 0;">
+                                <div class="card-header" style="padding: 0 0 12px 0;">
+                                    <h3 class="chart-title">이온 확산 계수 (log₁₀D vs. OCV)</h3>
+                                    <div class="header-controls">
+                                        <div class="control-item">
+                                            <label for="gittShowMode">보기 모드:</label>
+                                            <select id="gittShowMode" class="select-field inline-select">
+                                                <option value="both" selected>방전/충전 전체</option>
+                                                <option value="discharge">방전만 (Sodiation)</option>
+                                                <option value="charge">충전만 (Desodiation)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-container" style="height: 350px;">
+                                    <canvas id="chartGittDiffusion"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Right: Summary Table -->
+                            <div class="dashboard-chart-card table-card" style="margin: 0; border: none; background: transparent; padding: 0;">
+                                <div class="card-header" style="padding: 0 0 12px 0;">
+                                    <h3 class="chart-title">GITT 확산 계수 분석 결과 요약</h3>
+                                    <div class="header-controls">
+                                        <button class="btn btn-secondary btn-xs" id="btnExportGittCsv">
+                                            <span class="material-icons-round" style="font-size:12px;">download</span> CSV 내보내기
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="table-container" style="height: 350px; overflow-y: auto;">
+                                    <table class="academic-table" id="tableGittSummary" style="font-size: 11px;">
+                                        <thead>
+                                            <tr>
+                                                <th>구분</th>
+                                                <th>펄스</th>
+                                                <th>E₀ (V)</th>
+                                                <th>E_tau (V)</th>
+                                                <th>E_eq (V)</th>
+                                                <th>ΔE_t (V)</th>
+                                                <th>ΔE_s (V)</th>
+                                                <th>D (cm²/s)</th>
+                                                <th>log₁₀D</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tableGittSummaryBody">
+                                            <tr>
+                                                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 50px 0;">이온 확산 계수 계산 버튼을 클릭해 주십시오.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- 데이터명 입력 모달 -->
+    <div class="modal-overlay" id="datasetNameModal" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span class="material-icons-round" style="color: var(--color-primary);">save</span>
+                <h3>데이터셋 저장</h3>
+            </div>
+            <p class="modal-desc">업로드된 파일을 라이브러리에 저장합니다.<br>구분하기 쉽도록 이름을 입력하세요.</p>
+            <div class="modal-file-info" id="modalFileInfo">
+                <span class="material-icons-round" style="font-size:14px;">description</span>
+                <span id="modalFilename">파일명</span>
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="font-size: 11px; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">데이터셋 이름</label>
+                <input type="text" id="datasetNameInput" class="modal-input" placeholder="예: HC-Glu-1500°C, 실험세트A...">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="btnModalSkip">건너뛰기</button>
+                <button class="btn btn-primary" id="btnModalSave">
+                    <span class="material-icons-round" style="font-size:16px;">save</span> 저장하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Code Script with Cache Busting -->
+    <script src="app.js?v=2.7.0"></script>
+</body>
+</html>

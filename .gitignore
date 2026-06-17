@@ -1,0 +1,23 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python caching & bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Temporary python scripts
+analyze_excel.py
+analyze_excel_steps.py
+
+# Gemini / AI temporary cache
+.gemini/
+.idea/
+.vscode/
+
+# System / OS files
+.DS_Store
+Thumbs.db
