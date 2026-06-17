@@ -168,20 +168,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             switchActiveDataset(lastDs.id);
             welcomeView.style.display = 'none';
         } else {
-            // 저장된 기존 데이터가 없을 때만 데모 데이터 로드
-            setTimeout(() => {
-                const demoData = generateDemoData();
-                parseRawText(demoData, "260305_HC_glu_수열180(20h)_1500소성_1_085.xlsx");
-                welcomeView.style.display = 'none';
-            }, 150);
+            // 저장된 기존 데이터가 없을 때는 데모 데이터를 로드하지 않고 웰컴 화면 노출
+            welcomeView.style.display = 'flex';
         }
     } catch (err) {
         console.error("초기 데이터셋 로드 오류:", err);
-        setTimeout(() => {
-            const demoData = generateDemoData();
-            parseRawText(demoData, "260305_HC_glu_수열180(20h)_1500소성_1_085.xlsx");
-            welcomeView.style.display = 'none';
-        }, 150);
+        welcomeView.style.display = 'flex';
     }
 });
 
