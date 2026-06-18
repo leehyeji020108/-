@@ -445,6 +445,82 @@ body {
     color: white;
 }
 
+/* GITT 분석 - 업데이트 예정 버튼 스타일 */
+.tab-btn-coming-soon {
+    position: relative;
+    color: rgba(245, 158, 11, 0.7);
+    border: 1px dashed rgba(245, 158, 11, 0.3) !important;
+    background: rgba(245, 158, 11, 0.05) !important;
+}
+
+.tab-btn-coming-soon:hover {
+    color: rgba(245, 158, 11, 1) !important;
+    background: rgba(245, 158, 11, 0.12) !important;
+    border-color: rgba(245, 158, 11, 0.5) !important;
+}
+
+.coming-soon-badge {
+    font-size: 8px !important;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 4px;
+    padding: 1px 5px;
+    line-height: 1.4;
+    animation: comingSoonPulse 2s ease-in-out infinite;
+}
+
+@keyframes comingSoonPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* GITT Coming Soon 팝오버 토스트 */
+.gitt-toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: linear-gradient(135deg, rgba(20, 27, 45, 0.97), rgba(30, 40, 70, 0.97));
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 12px;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(245, 158, 11, 0.1);
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    backdrop-filter: blur(16px);
+}
+
+.gitt-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+}
+
+.gitt-toast-icon {
+    font-size: 28px;
+    color: #f59e0b;
+}
+
+.gitt-toast-text h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 2px;
+}
+
+.gitt-toast-text p {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
 /* Content Body */
 .content-body {
     padding: 28px;
@@ -1261,39 +1337,42 @@ select option {
 
 .mode-switcher {
     display: flex;
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(0, 0, 0, 0.25);
     border-radius: 8px;
-    padding: 3px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 4px;
 }
 
 .mode-btn {
     flex: 1;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 8px;
-    border: none;
+    padding: 8px 12px;
+    border: 1px solid transparent;
     border-radius: 6px;
     background: transparent;
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+    font-family: var(--font-sans);
 }
 
 .mode-btn:hover {
     color: var(--text-main);
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .mode-btn.active {
-    background: var(--color-accent);
+    background: var(--color-primary);
     color: #ffffff;
     font-weight: 600;
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 

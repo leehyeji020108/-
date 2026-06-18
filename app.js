@@ -153,6 +153,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     initDatasetLibrary(); // 데이터셋 라이브러리 이벤트 초기화
     initGittEvents(); // GITT 이벤트 및 입력값 연동 초기화
 
+    // 최초 로드 시 기본 분석 모드 UI 정렬 수행 (탭 숨김, 사이드바 정렬 등)
+    setAnalysisMode('general');
+
     // 데이터셋 초기 로드 완료 후 칩 UI 생성
     renderCycleChipsUI();
 
@@ -163,17 +166,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             datasetLibrary = savedDS;
             renderDatasetLibraryUI();
             
-            // 가장 마지막에 추가된 데이터셋을 활성화하여 화면 복원
-            const lastDs = datasetLibrary[datasetLibrary.length - 1];
-            switchActiveDataset(lastDs.id);
-            welcomeView.style.display = 'none';
+            // 처음 웹사이트 진입 시에는 무조건 일반 분석 창만 띄우도록 제어합니다.
+            // 일반 분석 데이터셋 중 가장 최신 것(가장 마지막에 추가된 것)을 찾아서 활성화합니다.
+            const lastGeneralDs = [...datasetLibrary].reverse().find(ds => !ds.isGitt);
+            if (lastGeneralDs) {
+                switchActiveDataset(lastGeneralDs.id);
+            } else {
+                // 일반 분석 데이터셋이 아예 존재하지 않는 경우, 빈 일반 분석 창을 유지합니다.
+                activeDatasetId = null;
+                setAnalysisMode('general');
+            }
+            if (welcomeView) welcomeView.style.display = 'none';
         } else {
-            // 저장된 기존 데이터가 없을 때는 데모 데이터를 로드하지 않고 웰컴 화면 노출
-            welcomeView.style.display = 'flex';
+            // 저장된 기존 데이터가 없을 때는 웰컴 화면을 노출하지 않고 기본 대시보드 상태 유지
+            if (welcomeView) welcomeView.style.display = 'none';
         }
     } catch (err) {
         console.error("초기 데이터셋 로드 오류:", err);
-        welcomeView.style.display = 'flex';
+        if (welcomeView) welcomeView.style.display = 'none';
     }
 });
 
@@ -216,136 +226,39 @@ function triggerChartResize() {
 
 // File Upload Drag & Drop & Input
 function initFileUpload() {
-    // Demo data trigger
-    const loadDemo = () => {
-        const demoData = generateDemoData();
-        parseRawText(demoData, "HardCarbon_Modified_Demo_Dataset.csv");
-        welcomeView.style.display = 'none';
-    };
+    // Drag/Drop visual states
+    if (dropZone) {
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-active');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-active');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        dropZone.addEventListener('click', () => {
+            if (fileInput) fileInput.click();
+        });
+    }
     
-    btnDemoData.addEventListener('click', loadDemo);
-    if (btnWelcomeDemo) {
-        btnWelcomeDemo.addEventListener('click', () => {
-            if (currentAnalysisMode === 'gitt') {
-                loadGittDemo();
-            } else {
-                loadDemo();
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
             }
         });
     }
-
-    const loadGittDemo = async () => {
-        try {
-            welcomeView.style.display = 'none';
-            activeFilename.textContent = 'GITT 데모 데이터 로드 중...';
-
-            // 미리 처리된 경량 JSON 파일을 fetch (xlsx 직접 파싱 시 메모리 오류 우회)
-            const [rawRes, resRes] = await Promise.all([
-                fetch('./data/gitt_demo_raw.json'),
-                fetch('./data/gitt_demo_results.json'),
-            ]);
-
-            if (!rawRes.ok || !resRes.ok) {
-                throw new Error('JSON 데모 파일을 찾을 수 없습니다. (gitt_demo_raw.json, gitt_demo_results.json)');
-            }
-
-            const rawCompact = await rawRes.json();
-            const resultsData = await resRes.json();
-
-            // 컴팩트 포맷({t,s,v}) → 표준 포맷({time,step,voltage,current,capacity})으로 변환 (용량 및 전류 재생성)
-            let cumCap = 0;
-            let prevTime = rawCompact[0].t;
-            gittRawData = rawCompact.map((d, idx) => {
-                if (idx > 0) {
-                    const dt = d.t - prevTime;
-                    if (d.s === 2 || d.s === 4) {
-                        const currentA = 0.5e-4; // 1.033 mg 기준 약 0.05C 전류 시뮬레이션 (최대 용량 약 0.0003 Ah 맞춤)
-                        cumCap += currentA * (dt / 3600.0);
-                    }
-                }
-                prevTime = d.t;
-                return {
-                    time: d.t,
-                    step: d.s,
-                    voltage: d.v,
-                    current: (d.s === 2 ? -0.5e-4 : (d.s === 4 ? 0.5e-4 : 0)),
-                    capacity: cumCap
-                };
-            });
-            gittResults = resultsData;
-
-            isGittMode = true;
-            rawBatteryData = [1];
-            gittConfigPanel.style.display = 'block';
-            configCard.style.display = 'none';
-
-            // 다중 회차 구조 생성
-            splitGittRuns(gittRawData);
-
-            const gittTabBtn = document.querySelector('.tab-btn[data-tab="tab-gitt"]');
-            if (gittTabBtn) {
-                tabButtons.forEach(b => b.classList.remove('active'));
-                tabPanels.forEach(p => p.classList.remove('active'));
-                gittTabBtn.classList.add('active');
-                document.getElementById('tab-gitt').classList.add('active');
-            }
-
-            activeFilename.textContent = '2.0V_CTP_GITT_1_033_DC.xlsx';
-            document.querySelector('.header-info .badge').textContent = 'LOADED';
-            document.querySelector('.header-info .badge').className = 'badge badge-info';
-
-            // 프로파일 차트 먼저 렌더링
-            runGittAnalysis();
-
-            showDatasetNameModal('2.0V_CTP_GITT_1_033_DC.xlsx');
-
-            // 데모 로드의 경우 계산 결과 대시보드 자동 노출
-            setTimeout(() => {
-                if (btnCalculateGittDiffusion) {
-                    btnCalculateGittDiffusion.click();
-                }
-            }, 300);
-        } catch (error) {
-            console.error('GITT 데모 로드 실패:', error);
-            alert('GITT 데모 데이터 로드에 실패했습니다.\n\n' + error.message);
-            activeFilename.textContent = '분석할 데이터를 업로드해 주세요';
-            welcomeView.style.display = 'flex';
-        }
-    };
-
-    if (btnGittDemoData) {
-        btnGittDemoData.addEventListener('click', loadGittDemo);
-    }
-    
-    // Drag/Drop visual states
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('drag-active');
-    });
-    
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('drag-active');
-    });
-    
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-active');
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            handleFile(files[0]);
-        }
-    });
-    
-    dropZone.addEventListener('click', () => {
-        fileInput.click();
-    });
-    
-    fileInput.addEventListener('change', (e) => {
-        const files = e.target.files;
-        if (files.length > 0) {
-            handleFile(files[0]);
-        }
-    });
 }
 
 // Reads raw file data (Supports XLSX / CSV / TXT)
@@ -961,6 +874,7 @@ function switchActiveDataset(id) {
 
     activeDatasetId = id;
 
+    // 1. 메모리 전역 상태 데이터 로드
     if (ds.isGitt) {
         isGittMode = true;
         gittRawData = JSON.parse(JSON.stringify(ds.gittRawData));
@@ -981,100 +895,99 @@ function switchActiveDataset(id) {
         document.querySelector('.header-info .badge').textContent = "LOADED";
         document.querySelector('.header-info .badge').className = "badge badge-info";
 
-        gittConfigPanel.style.display = 'block';
-        configCard.style.display = 'none';
-
-        // GITT 탭으로 이동
-        const gittTabBtn = document.querySelector('.tab-btn[data-tab="tab-gitt"]');
-        if (gittTabBtn) {
-            tabButtons.forEach(b => b.classList.remove('active'));
-            tabPanels.forEach(p => p.classList.remove('active'));
-            gittTabBtn.classList.add('active');
-            document.getElementById('tab-gitt').classList.add('active');
-        }
-
-        renderDatasetLibraryUI();
-        runAnalysis();
-
-        // 기존 분석 결과가 저장되어 있다면 결과 영역 즉시 노출 및 그래프 렌더링
+        // GITT 관련 결과 영역 제어
         if (gittResults && gittResults.length > 0 && gittResults[0].D !== undefined) {
             if (gittCalcResultsArea) gittCalcResultsArea.style.display = 'grid';
             calculateFinalGittDiffusion();
             renderGittDiffusionChart();
             updateGittSummaryTable();
         }
-        return;
-    }
+    } else {
+        isGittMode = false;
 
-    isGittMode = false;
-    gittConfigPanel.style.display = 'none';
-    configCard.style.display = 'block';
+        // 전역 processedCycles를 해당 데이터셋으로 교체
+        processedCycles = JSON.parse(JSON.stringify(ds.processedCycles));
+        rawBatteryData = [1]; // 빈 배열이면 분석 블록됨, 더미 값으로 방어
 
-    // 전역 processedCycles를 해당 데이터셋으로 교체
-    processedCycles = JSON.parse(JSON.stringify(ds.processedCycles));
-    rawBatteryData = [1]; // 빈 배열이면 분석 블록됨, 더미 값으로 방어
+        // 헤더 업데이트
+        activeFilename.textContent = ds.customName;
+        document.querySelector('.header-info .badge').textContent = "LOADED";
+        document.querySelector('.header-info .badge').className = "badge badge-info";
 
-    // 헤더 업데이트
-    activeFilename.textContent = ds.customName;
-    document.querySelector('.header-info .badge').textContent = "LOADED";
-    document.querySelector('.header-info .badge').className = "badge badge-info";
+        // 사이클 셀렉터 재구성
+        const cycleNumbers = Object.keys(processedCycles).map(Number).sort((a, b) => a - b);
+        targetCycleSelect.innerHTML = '';
+        if (targetCycleSelectSP) targetCycleSelectSP.innerHTML = '';
+        if (targetCycleDqDv) targetCycleDqDv.innerHTML = '';
 
-    // 사이클 셀렉터 재구성
-    const cycleNumbers = Object.keys(processedCycles).map(Number).sort((a, b) => a - b);
-    targetCycleSelect.innerHTML = '';
-    if (targetCycleSelectSP) targetCycleSelectSP.innerHTML = '';
-    if (targetCycleDqDv) targetCycleDqDv.innerHTML = '';
+        const optAll = document.createElement('option');
+        optAll.value = 'all';
+        optAll.textContent = '전체 사이클 (All)';
+        targetCycleSelect.appendChild(optAll);
 
-    const optAll = document.createElement('option');
-    optAll.value = 'all';
-    optAll.textContent = '전체 사이클 (All)';
-    targetCycleSelect.appendChild(optAll);
+        cycleNumbers.forEach(cNum => {
+            const o1 = document.createElement('option');
+            o1.value = cNum; o1.textContent = `${cNum} Cycle`;
+            targetCycleSelect.appendChild(o1);
 
-    cycleNumbers.forEach(cNum => {
-        const o1 = document.createElement('option');
-        o1.value = cNum; o1.textContent = `${cNum} Cycle`;
-        targetCycleSelect.appendChild(o1);
+            if (targetCycleSelectSP) {
+                const o2 = document.createElement('option');
+                o2.value = cNum; o2.textContent = `${cNum} Cycle`;
+                targetCycleSelectSP.appendChild(o2);
+            }
 
-        if (targetCycleSelectSP) {
-            const o2 = document.createElement('option');
-            o2.value = cNum; o2.textContent = `${cNum} Cycle`;
-            targetCycleSelectSP.appendChild(o2);
+            if (targetCycleDqDv) {
+                const o3 = document.createElement('option');
+                o3.value = cNum; o3.textContent = `${cNum} Cycle`;
+                targetCycleDqDv.appendChild(o3);
+            }
+        });
+
+        targetCycleSelect.value = 'all';
+        if (targetCycleSelectSP) targetCycleSelectSP.value = cycleNumbers[0] || 1;
+        if (targetCycleDqDv) targetCycleDqDv.value = cycleNumbers[0] || 1;
+
+        if (dqdvMass && ds.mass !== undefined) {
+            dqdvMass.value = ds.mass;
         }
 
-        if (targetCycleDqDv) {
-            const o3 = document.createElement('option');
-            o3.value = cNum; o3.textContent = `${cNum} Cycle`;
-            targetCycleDqDv.appendChild(o3);
+        // 활성 데이터셋 전환 시, 다중 사이클 선택 목록을 첫 사이클로 초기화
+        if (cycleNumbers.length > 0) {
+            selectedDqDvCycles = [cycleNumbers[0]];
         }
-    });
-
-    targetCycleSelect.value = 'all';
-    if (targetCycleSelectSP) targetCycleSelectSP.value = cycleNumbers[0] || 1;
-    if (targetCycleDqDv) targetCycleDqDv.value = cycleNumbers[0] || 1;
-
-    if (dqdvMass && ds.mass !== undefined) {
-        dqdvMass.value = ds.mass;
+        renderCycleChipsUI();
     }
 
-    // 활성 데이터셋 전환 시, 다중 사이클 선택 목록을 첫 사이클로 초기화
-    if (cycleNumbers.length > 0) {
-        selectedDqDvCycles = [cycleNumbers[0]];
-    }
-    renderCycleChipsUI();
-
-    renderDatasetLibraryUI();
-    runAnalysis();
-
-    // 일반 분석 모드로 전환 시 active 탭이 GITT에 머무르지 않도록 '개요 & ICE' 탭으로 강제 전환
-    const activeTabBtn = document.querySelector('.tab-btn.active');
-    if (!activeTabBtn || activeTabBtn.getAttribute('data-tab') === 'tab-gitt') {
-        const fallbackBtn = document.querySelector('.tab-btn[data-tab="tab-overview"]');
-        if (fallbackBtn) {
-            tabButtons.forEach(b => b.classList.remove('active'));
-            tabPanels.forEach(p => p.classList.remove('active'));
-            fallbackBtn.classList.add('active');
-            const fallbackPanel = document.getElementById('tab-overview');
-            if (fallbackPanel) fallbackPanel.classList.add('active');
+    // 2. 현재 모드가 로드된 데이터셋 종류와 일치하지 않으면 UI 및 모드 갱신
+    const targetMode = ds.isGitt ? 'gitt' : 'general';
+    if (currentAnalysisMode !== targetMode) {
+        setAnalysisMode(targetMode);
+    } else {
+        // 이미 분석 모드가 일치하는 경우, 화면 탭과 그래프 갱신만 수행
+        if (ds.isGitt) {
+            // GITT 탭으로 강제 이동
+            const gittTabBtn = document.querySelector('.tab-btn[data-tab="tab-gitt"]');
+            if (gittTabBtn) {
+                tabButtons.forEach(b => b.classList.remove('active'));
+                tabPanels.forEach(p => p.classList.remove('active'));
+                gittTabBtn.classList.add('active');
+                document.getElementById('tab-gitt').classList.add('active');
+            }
+            runAnalysis();
+        } else {
+            // 일반 분석 탭에 머물러 있으면 해당 탭 갱신, 만약 GITT 탭에 있었다면 개요로 강제 복원
+            const activeTabBtn = document.querySelector('.tab-btn.active');
+            if (!activeTabBtn || activeTabBtn.getAttribute('data-tab') === 'tab-gitt') {
+                const fallbackBtn = document.querySelector('.tab-btn[data-tab="tab-overview"]');
+                if (fallbackBtn) {
+                    tabButtons.forEach(b => b.classList.remove('active'));
+                    tabPanels.forEach(p => p.classList.remove('active'));
+                    fallbackBtn.classList.add('active');
+                    const fallbackPanel = document.getElementById('tab-overview');
+                    if (fallbackPanel) fallbackPanel.classList.add('active');
+                }
+            }
+            runAnalysis();
         }
     }
 }
@@ -1776,24 +1689,27 @@ function processData() {
         const rawSod = points.filter(p => p.current < 0);
         const rawDesod = points.filter(p => p.current > 0);
 
-        // Rest 구간 분할로 인해 충방전 용량이 각 구간별로 순수하게 누적되어 들어오므로, 억지 보정(startCap 감산) 없이 원본 그대로 보존합니다.
+        // 방전/충전 각 구간의 capacity를 0에서 시작하도록 정규화합니다.
+        // (장비에 따라 방전 시작 시 capacity가 0이 아닌 값일 수 있으므로 시작점을 빼줍니다)
         if (rawSod.length > 0) {
-            cycleData.sodiation = rawSod.map((p, idx) => ({
+            const sodStartCap = rawSod[0].capacity;
+            cycleData.sodiation = rawSod.map((p) => ({
                 voltage: p.voltage,
-                capacity: p.capacity, // 원본 용량 그대로 사용
+                capacity: p.capacity - sodStartCap, // 0부터 시작하도록 정규화
                 current: p.current
             }));
-            // Rest 돌입 직전의 마지막 데이터 포인트의 용량 값이 방전 용량입니다.
+            // 마지막 포인트의 정규화된 capacity = 실제 방전 용량
             cycleData.totalDischargeCap = cycleData.sodiation[cycleData.sodiation.length - 1].capacity;
         }
 
         if (rawDesod.length > 0) {
-            cycleData.desodiation = rawDesod.map((p, idx) => ({
+            const desodStartCap = rawDesod[0].capacity;
+            cycleData.desodiation = rawDesod.map((p) => ({
                 voltage: p.voltage,
-                capacity: p.capacity, // 원본 용량 그대로 사용
+                capacity: p.capacity - desodStartCap, // 0부터 시작하도록 정규화
                 current: p.current
             }));
-            // Rest 돌입 직전의 마지막 데이터 포인트의 용량 값이 충전 용량입니다.
+            // 마지막 포인트의 정규화된 capacity = 실제 충전 용량
             cycleData.totalChargeCap = cycleData.desodiation[cycleData.desodiation.length - 1].capacity;
         }
     }
@@ -2962,17 +2878,9 @@ function renderSlopePlateauChart(cycleData, cutoffV) {
             const cyc = ds.processedCycles[cNum];
             if (!cyc || !cyc.sodiation) return;
 
-            const sodPoints = cyc.sodiation;
-            let rawSlope = [], rawPlateau = [];
-            const transitionIdx = sodPoints.findIndex(p => p.voltage <= cutoffV);
-            if (transitionIdx === -1) {
-                rawSlope = sodPoints;
-            } else {
-                rawSlope = sodPoints.slice(0, transitionIdx + 1);
-                rawPlateau = sodPoints.slice(transitionIdx);
-            }
+            // 개요 창과 동일하게 전체 방전 데이터를 먼저 다운샘플링하여 끊김을 방지합니다.
             const allData = downsamplePoints(
-                [...rawSlope, ...rawPlateau].map(p => ({ x: p.capacity, y: p.voltage })), 600
+                cyc.sodiation.map(p => ({ x: p.capacity, y: p.voltage })), 1500
             );
 
             chartDatasets.push({
@@ -3013,17 +2921,24 @@ function renderSlopePlateauChart(cycleData, cutoffV) {
     } else {
         // ===== 단일 데이터셋: Slope/Plateau 영역 하이라이트 =====
         if (!cycleData) { chartSlopePlateauInstance = null; return; }
-        const sodPoints = cycleData.sodiation;
-        let rawSlope = [], rawPlateau = [];
-        const transitionIdx = sodPoints.findIndex(p => p.voltage <= cutoffV);
+        
+        // 개요 창과 동일하게 전체 방전 데이터를 먼저 다운샘플링합니다.
+        const allSodData = downsamplePoints(
+            cycleData.sodiation.map(p => ({ x: p.capacity, y: p.voltage })), 1500
+        );
+
+        let slopeData = [];
+        let plateauData = [];
+
+        // 다운샘플링된 전체 데이터에서 cutoffV 이하로 떨어지는 첫 번째 지점을 찾습니다.
+        const transitionIdx = allSodData.findIndex(p => p.y <= cutoffV);
         if (transitionIdx === -1) {
-            rawSlope = sodPoints;
+            slopeData = allSodData;
         } else {
-            rawSlope = sodPoints.slice(0, transitionIdx + 1);
-            rawPlateau = sodPoints.slice(transitionIdx);
+            // Slope와 Plateau 영역이 매끄럽게 이어지도록 경계 포인트(transitionIdx)를 둘 다에 포함합니다.
+            slopeData = allSodData.slice(0, transitionIdx + 1);
+            plateauData = allSodData.slice(transitionIdx);
         }
-        const slopeData = downsamplePoints(rawSlope.map(p => ({ x: p.capacity, y: p.voltage })), 800);
-        const plateauData = downsamplePoints(rawPlateau.map(p => ({ x: p.capacity, y: p.voltage })), 800);
 
         chartDatasets = [
             {
@@ -3066,7 +2981,9 @@ function renderSlopePlateauChart(cycleData, cutoffV) {
                     type: 'linear',
                     title: { display: true, text: 'Voltage (V vs. Na/Na+)', color: '#fff', font: { size: 12, weight: '600' } },
                     grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#9ca3af' }, min: 0, max: 2.1
+                    ticks: { color: '#9ca3af' },
+                    suggestedMin: -0.05,
+                    suggestedMax: 2.1
                 }
             },
             plugins: {
@@ -9946,10 +9863,24 @@ function setAnalysisMode(mode) {
             }
         }
     } else {
-        // 데이터가 없으면 웰컴 화면 노출 및 탭 활성화 해제
-        if (welcomeView) welcomeView.style.display = 'flex';
+        // 데이터가 없어도 웰컴 화면을 노출하지 않고 빈 대시보드 화면을 띄웁니다.
+        if (welcomeView) welcomeView.style.display = 'none';
+        
         tabPanels.forEach(p => p.classList.remove('active'));
         tabBtns.forEach(b => b.classList.remove('active'));
+        
+        // 데이터가 없는 기본 상태에서도 탭 버튼과 패널의 active 상태를 매칭해 줍니다.
+        if (mode === 'general') {
+            const fallbackBtn = document.querySelector('.tab-btn[data-tab="tab-overview"]');
+            if (fallbackBtn) fallbackBtn.classList.add('active');
+            const fallbackPanel = document.getElementById('tab-overview');
+            if (fallbackPanel) fallbackPanel.classList.add('active');
+        } else {
+            const fallbackBtn = document.querySelector('.tab-btn[data-tab="tab-gitt"]');
+            if (fallbackBtn) fallbackBtn.classList.add('active');
+            const fallbackPanel = document.getElementById('tab-gitt');
+            if (fallbackPanel) fallbackPanel.classList.add('active');
+        }
     }
     
     // 라이브러리 UI 렌더링 갱신
