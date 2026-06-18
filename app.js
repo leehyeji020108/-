@@ -25,6 +25,12 @@ let activeDatasetId = null; // 현재 단일 분석 중인 데이터셋 ID
 let _pendingParsedData = null; // 모달 열기 전 임시 보관 (parseData → modal → finalize 흐름)
 let _pendingFilename = ''; // 모달에 표시할 파일명 임시 보관
 
+// ============================================================
+// 다중 파일 업로드용 큐 상태
+// ============================================================
+let _fileQueue = [];           // 업로드 대기 중인 File 객체 배열
+let _parsedQueue = [];         // 파싱 완료된 { filename, processedCycles, rawData } 배열
+
 // 데이터셋 색상 팔레트 (최대 8개 데이터셋 지원)
 const DATASET_COLORS = [
     '#60a5fa', // 파란색
@@ -130,6 +136,7 @@ const gittChargeCycleSelect = document.getElementById('gittChargeCycle');
 const btnDownloadProfile = document.getElementById('btnDownloadProfile');
 const btnDownloadSlopeChart = document.getElementById('btnDownloadSlopeChart');
 const btnDownloadRateData = document.getElementById('btnDownloadRateData');
+const btnDownloadRateDetailData = document.getElementById('btnDownloadRateDetailData');
 
 // Tables
 const tableSlopePlateau = document.getElementById('tableSlopePlateau');
@@ -192,13 +199,19 @@ function initTabs() {
     tabButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             if (rawBatteryData.length === 0) return; // No data loaded
-            
+
+            // data-tab 속성이 없는 버튼(예: GITT 외부 창 버튼)은 탭 전환 처리를 건너뜁니다.
+            const tabId = btn.getAttribute('data-tab');
+            if (!tabId) return;
+
+            const tabPanel = document.getElementById(tabId);
+            if (!tabPanel) return; // 해당 패널이 DOM에 없으면 스킵
+
             tabButtons.forEach(b => b.classList.remove('active'));
             tabPanels.forEach(p => p.classList.remove('active'));
             
             btn.classList.add('active');
-            const tabId = btn.getAttribute('data-tab');
-            document.getElementById(tabId).classList.add('active');
+            tabPanel.classList.add('active');
             
             // Re-render chart on tab display to fix sizing issues
             setTimeout(() => {
@@ -224,41 +237,88 @@ function triggerChartResize() {
     if (chartGittDiffusionInstance) chartGittDiffusionInstance.resize();
 }
 
-// File Upload Drag & Drop & Input
+// File Upload Drag & Drop & Input (다중 파일 지원)
 function initFileUpload() {
-    // Drag/Drop visual states
     if (dropZone) {
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.classList.add('drag-active');
         });
-        
         dropZone.addEventListener('dragleave', () => {
             dropZone.classList.remove('drag-active');
         });
-        
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('drag-active');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
+            const files = Array.from(e.dataTransfer.files).filter(f =>
+                /\.(csv|txt|xlsx|xls)$/i.test(f.name)
+            );
+            if (files.length > 0) handleMultipleFiles(files);
         });
-        
         dropZone.addEventListener('click', () => {
             if (fileInput) fileInput.click();
         });
     }
-    
     if (fileInput) {
         fileInput.addEventListener('change', (e) => {
-            const files = e.target.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
+            const files = Array.from(e.target.files);
+            if (files.length > 0) handleMultipleFiles(files);
+            // 같은 파일 재선택 가능하도록 초기화
+            fileInput.value = '';
         });
     }
+}
+
+/**
+ * 여러 파일을 일괄 처리하는 진입점.
+ * 모든 파일을 파싱한 후 이름 입력 모달을 한번에 띄웁니다.
+ */
+function handleMultipleFiles(files) {
+    _fileQueue = [...files];
+    _parsedQueue = [];
+    activeFilename.textContent = `파일 ${files.length}개 처리 중...`;
+    if (welcomeView) welcomeView.style.display = 'none';
+    parseNextFileInQueue();
+}
+
+/**
+ * 큐에서 다음 파일을 꺼내 파싱합니다. 모두 완료되면 이름 모달을 엽니다.
+ */
+function parseNextFileInQueue() {
+    if (_fileQueue.length === 0) {
+        // 모든 파일 파싱 완료 → 이름 설정 모달 표시
+        if (_parsedQueue.length > 0) {
+            showMultiFileNameModal();
+        }
+        return;
+    }
+    const file = _fileQueue.shift();
+    const ext = file.name.split('.').pop().toLowerCase();
+    // 파싱 완료 콜백을 받기 위해 전역 플래그 설정
+    _currentQueueFile = file.name;
+    if (ext === 'xlsx' || ext === 'xls') {
+        parseExcelFileQueued(file);
+    } else {
+        readTextFileQueued(file);
+    }
+}
+
+// 큐 파싱용 현재 파일명 임시 보관
+let _currentQueueFile = '';
+
+/**
+ * 큐 파싱 완료 시 호출되는 콜백. processedCycles 스냅샷을 _parsedQueue에 저장합니다.
+ */
+function onQueueFileParsed(filename) {
+    // processData() 호출 후 processedCycles가 채워진 상태에서 호출됨
+    const savedCycles = JSON.parse(JSON.stringify(processedCycles));
+    for (const cycleNum in savedCycles) {
+        const cyc = savedCycles[cycleNum];
+        if (cyc) { delete cyc.all; delete cyc.rawSodiation; delete cyc.rawDesodiation; }
+    }
+    _parsedQueue.push({ filename, processedCycles: savedCycles });
+    // 다음 파일 처리
+    parseNextFileInQueue();
 }
 
 // Reads raw file data (Supports XLSX / CSV / TXT)
@@ -350,15 +410,70 @@ function checkHasHeaders(jsonData) {
 function handleFile(file) {
     const filename = file.name;
     const extension = filename.split('.').pop().toLowerCase();
-    
     activeFilename.textContent = `로드 중: ${filename}...`;
-    welcomeView.style.display = 'none';
-    
+    if (welcomeView) welcomeView.style.display = 'none';
     if (extension === 'xlsx' || extension === 'xls') {
         parseExcelFile(file);
     } else {
         readTextFile(file);
     }
+}
+
+// ---- 큐 파싱용 Excel 파서 (onQueueFileParsed 콜백 연결) ----
+function parseExcelFileQueued(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = e.target.result;
+            const workbook = XLSX.read(data, { type: 'array' });
+            const preferredSheets = workbook.SheetNames.filter(name => {
+                const lower = name.toLowerCase();
+                return lower.includes('data') || lower.includes('raw') || lower.includes('sheet1');
+            });
+            const searchOrder = [...preferredSheets, ...workbook.SheetNames.filter(n => !preferredSheets.includes(n))];
+            let targetJsonData = null;
+            for (const sheetName of searchOrder) {
+                const ws = workbook.Sheets[sheetName];
+                if (!ws) continue;
+                const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                if (json && json.length >= 2 && checkHasHeaders(json)) {
+                    targetJsonData = json; break;
+                }
+            }
+            if (!targetJsonData) {
+                targetJsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+            }
+            // 파싱 (processedCycles 채워짐)
+            parseExcelData(targetJsonData, file.name);
+            // 파싱 완료 후 큐 콜백 호출
+            onQueueFileParsed(file.name);
+        } catch (err) {
+            console.error('큐 Excel 파싱 오류:', err);
+            // 오류가 나도 다음 파일로 계속 진행
+            parseNextFileInQueue();
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// ---- 큐 파싱용 텍스트 파서 ----
+function readTextFileQueued(file, encoding = 'UTF-8') {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target.result;
+        const success = parseRawText(text, file.name, encoding);
+        if (!success && encoding === 'UTF-8') {
+            readTextFileQueued(file, 'EUC-KR');
+            return;
+        }
+        if (success) {
+            onQueueFileParsed(file.name);
+        } else {
+            console.warn('큐 텍스트 파싱 실패:', file.name);
+            parseNextFileInQueue();
+        }
+    };
+    reader.readAsText(file, encoding);
 }
 
 function readTextFile(file, encoding = 'UTF-8') {
@@ -717,152 +832,184 @@ function initDatasetLibrary() {
     const btnSave = document.getElementById('btnModalSave');
     const btnSkip = document.getElementById('btnModalSkip');
     const modal   = document.getElementById('datasetNameModal');
-    const nameInput = document.getElementById('datasetNameInput');
 
     if (btnSave) {
+        // 저장하기: 각 입력란의 값을 읽어서 다중 저장
         btnSave.addEventListener('click', () => {
-            const customName = (nameInput ? nameInput.value.trim() : '') || _pendingFilename;
-            finalizeDatasetSave(customName);
+            finalizeMultiDatasetSave(false);
         });
     }
-
     if (btnSkip) {
+        // 건너뛰기: 파일명을 그대로 이름으로 사용
         btnSkip.addEventListener('click', () => {
-            // 건너뛰기: 파일명을 이름으로 사용해 저장
-            finalizeDatasetSave(_pendingFilename);
+            finalizeMultiDatasetSave(true);
         });
     }
-
-    // Enter 키로도 저장 가능
-    if (nameInput) {
-        nameInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const customName = nameInput.value.trim() || _pendingFilename;
-                finalizeDatasetSave(customName);
-            }
-        });
-    }
-
     // 모달 바깥 영역 클릭 시 건너뛰기
     if (modal) {
         modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                finalizeDatasetSave(_pendingFilename);
-            }
+            if (e.target === modal) finalizeMultiDatasetSave(true);
         });
     }
 }
 
 /**
- * 파싱 완료 후 데이터셋 이름 입력 모달을 표시합니다.
- * processData()가 이미 호출된 상태여야 합니다 (processedCycles가 채워진 상태).
+ * 다중 파일 이름 입력 모달을 표시합니다.
+ * _parsedQueue 배열의 각 항목에 대해 이름 입력란을 생성합니다.
  */
-function showDatasetNameModal(filename) {
-    _pendingFilename = filename;
+function showMultiFileNameModal() {
+    const modal = document.getElementById('datasetNameModal');
+    const list  = document.getElementById('multiFileNameList');
+    const titleEl = document.getElementById('modalTitle');
+    const descEl  = document.getElementById('modalDesc');
+    if (!modal || !list) return;
 
-    const modal     = document.getElementById('datasetNameModal');
-    const nameInput = document.getElementById('datasetNameInput');
-    const fnLabel   = document.getElementById('modalFilename');
+    const count = _parsedQueue.length;
+    if (titleEl) titleEl.textContent = count > 1 ? `데이터셋 ${count}개 저장` : '데이터셋 저장';
+    if (descEl) descEl.textContent = count > 1
+        ? `${count}개 파일을 라이브러리에 저장합니다. 각 파일의 이름을 설정하세요.`
+        : '업로드된 파일을 라이브러리에 저장합니다. 이름을 입력하세요.';
 
-    if (fnLabel) fnLabel.textContent = filename;
+    list.innerHTML = '';
+    _parsedQueue.forEach((item, idx) => {
+        const defaultName = item.filename.replace(/\.[^.]+$/, '');
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; flex-direction:column; gap:5px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:10px 12px;';
+        row.innerHTML = `
+            <div style="display:flex; align-items:center; gap:6px; font-size:10px; color:var(--text-muted);">
+                <span class="material-icons-round" style="font-size:13px;">description</span>
+                <span>${item.filename}</span>
+            </div>
+            <input type="text"
+                id="multiNameInput_${idx}"
+                class="modal-input"
+                value="${defaultName}"
+                placeholder="데이터셋 이름 (예: HC-Glu-1500°C)"
+                style="margin:0;"
+            >
+        `;
+        list.appendChild(row);
+    });
 
-    // 기본 이름: 파일명에서 확장자 제거
-    const defaultName = filename.replace(/\.[^.]+$/, '');
-    if (nameInput) {
-        nameInput.value = defaultName;
-        // 모달 열릴 때 자동 포커스 및 전체 선택
-        setTimeout(() => { nameInput.select(); nameInput.focus(); }, 100);
-    }
+    // 첫 번째 입력란에 포커스
+    setTimeout(() => {
+        const first = document.getElementById('multiNameInput_0');
+        if (first) { first.select(); first.focus(); }
+    }, 100);
 
-    if (modal) modal.style.display = 'flex';
+    modal.style.display = 'flex';
 }
 
 /**
- * 모달에서 이름 확정 후 라이브러리에 저장하고 runAnalysis 호출
+ * 모달에서 확정 버튼 클릭 시 _parsedQueue 전체를 라이브러리에 저장합니다.
+ * @param {boolean} useFilenames - true면 입력값 무시하고 파일명 그대로 사용
  */
-async function finalizeDatasetSave(customName) {
+async function finalizeMultiDatasetSave(useFilenames) {
     const modal = document.getElementById('datasetNameModal');
     if (modal) modal.style.display = 'none';
 
-    // 색상 배정 (순환)
-    const colorIdx = datasetLibrary.length % DATASET_COLORS.length;
-    const color = DATASET_COLORS[colorIdx];
-    const id = Date.now().toString();
+    const savedAt = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    let lastDataset = null;
 
-    let dataset;
-    if (isGittMode) {
-        dataset = {
-            id,
-            customName: customName || _pendingFilename,
-            filename: _pendingFilename,
-            uploadedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-            isGitt: true,
-            gittRawData: JSON.parse(JSON.stringify(gittRawData)),
-            gittResults: JSON.parse(JSON.stringify(gittResults)),
-            color,
-            compareEnabled: false,
-            gittParams: {
-                mass: parseFloat(gittMassInput.value) || 1.033,
-                area: parseFloat(gittAreaInput.value) || 1.54,
-                vol: parseFloat(gittVolInput.value) || 9.38,
-                molarMass: parseFloat(gittMolarMassInput.value) || 12.011
-            }
-        };
-    } else {
-        // 현재 processedCycles를 딥카피하여 저장 (이후 업로드로 덮어쓰여도 보존)
-        const savedCycles = JSON.parse(JSON.stringify(processedCycles));
-        
-        // DB 저장 용량 최소화 및 전송 속도 향상을 위해 사용되지 않는 대용량 중간 적재 필드 소거
-        for (const cycleNum in savedCycles) {
-            const cyc = savedCycles[cycleNum];
-            if (cyc) {
-                delete cyc.all;
-                delete cyc.rawSodiation;
-                delete cyc.rawDesodiation;
-            }
-        }
-        
+    for (let idx = 0; idx < _parsedQueue.length; idx++) {
+        const item = _parsedQueue[idx];
+        const inputEl = document.getElementById(`multiNameInput_${idx}`);
+        const customName = useFilenames
+            ? item.filename.replace(/\.[^.]+$/, '')
+            : (inputEl ? inputEl.value.trim() : '') || item.filename.replace(/\.[^.]+$/, '');
+
+        const colorIdx = datasetLibrary.length % DATASET_COLORS.length;
+        const color = DATASET_COLORS[colorIdx];
+        const id = (Date.now() + idx).toString();
+
+        const savedCycles = item.processedCycles;
         const totalCycles = Object.keys(savedCycles).length;
-
-        // ICE 계산 (1번 사이클 기준)
         const firstCyc = savedCycles[1];
         const ice = firstCyc && firstCyc.totalDischargeCap > 0
             ? ((firstCyc.totalChargeCap / firstCyc.totalDischargeCap) * 100).toFixed(1)
             : '-';
 
-        dataset = {
+        const dataset = {
             id,
-            customName: customName || _pendingFilename,
-            filename: _pendingFilename,
-            uploadedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            customName,
+            filename: item.filename,
+            uploadedAt: savedAt,
             processedCycles: savedCycles,
             totalCycles,
             ice,
             color,
-            compareEnabled: true,  // 비교 오버레이 체크 여부
-            selectedCycle: 1,        // 이 데이터셋에서 사용할 비교 사이클 번호
+            compareEnabled: true,
+            selectedCycle: 1,
             mass: dqdvMass ? parseFloat(dqdvMass.value) || 2.58 : 2.58
         };
+
+        datasetLibrary.push(dataset);
+        lastDataset = dataset;
+
+        try { await saveDatasetToDB(dataset); }
+        catch (e) { console.warn('DB 저장 실패:', e); }
     }
 
-    datasetLibrary.push(dataset);
-    activeDatasetId = id;
+    _parsedQueue = [];
 
-    // 헤더 파일명 업데이트
-    activeFilename.textContent = dataset.customName;
+    if (!lastDataset) return;
 
-    // 라이브러리 UI 갱신
+    // 마지막 파일을 활성 데이터셋으로 설정
+    // (하지만 processedCycles는 마지막 파싱 결과가 메모리에 남아있으므로 switchActiveDataset 사용)
+    activeDatasetId = lastDataset.id;
+    processedCycles = JSON.parse(JSON.stringify(lastDataset.processedCycles));
+    rawBatteryData = [1]; // 분석 블로킹 방지 더미값
+    activeFilename.textContent = lastDataset.customName;
+    document.querySelector('.header-info .badge').textContent = 'LOADED';
+    document.querySelector('.header-info .badge').className = 'badge badge-info';
+
     renderDatasetLibraryUI();
 
-    // DB에 비동기 저장 (GITT는 rawData 크기가 크므로 저장 시도만)
-    try {
-        await saveDatasetToDB(dataset);
-    } catch (e) {
-        console.warn('DB 저장 실패 (용량 초과 가능성):', e);
-    }
+    // 사이클 셀렉터 재구성
+    const cycleNumbers = Object.keys(processedCycles).map(Number).sort((a, b) => a - b);
+    targetCycleSelect.innerHTML = '';
+    if (targetCycleSelectSP) targetCycleSelectSP.innerHTML = '';
+    if (targetCycleDqDv) targetCycleDqDv.innerHTML = '';
+    const optAll = document.createElement('option');
+    optAll.value = 'all'; optAll.textContent = '전체 사이클 (All)';
+    targetCycleSelect.appendChild(optAll);
+    cycleNumbers.forEach(cNum => {
+        const o1 = document.createElement('option'); o1.value = cNum; o1.textContent = `${cNum} Cycle`;
+        targetCycleSelect.appendChild(o1);
+        if (targetCycleSelectSP) { const o2 = o1.cloneNode(true); targetCycleSelectSP.appendChild(o2); }
+        if (targetCycleDqDv) { const o3 = o1.cloneNode(true); targetCycleDqDv.appendChild(o3); }
+    });
+    targetCycleSelect.value = 'all';
+    if (targetCycleSelectSP) targetCycleSelectSP.value = cycleNumbers[0] || 1;
+    if (targetCycleDqDv) targetCycleDqDv.value = cycleNumbers[0] || 1;
+    if (cycleNumbers.length > 0) selectedDqDvCycles = [cycleNumbers[0]];
+    renderCycleChipsUI();
 
-    // 분석 실행
     runAnalysis();
+}
+
+/**
+ * 단일 파일 파싱 완료 후 모달 표시 (기존 호환성 유지용)
+ * parseExcelData, parseRawText 에서 직접 호출됩니다.
+ */
+function showDatasetNameModal(filename) {
+    // 단일 파일을 _parsedQueue에 넣고 다중 모달을 사용
+    // (이미 processedCycles에 데이터가 채워진 상태)
+    _pendingFilename = filename;
+    const savedCycles = JSON.parse(JSON.stringify(processedCycles));
+    for (const cycleNum in savedCycles) {
+        const cyc = savedCycles[cycleNum];
+        if (cyc) { delete cyc.all; delete cyc.rawSodiation; delete cyc.rawDesodiation; }
+    }
+    _parsedQueue = [{ filename, processedCycles: savedCycles }];
+    showMultiFileNameModal();
+}
+
+/**
+ * (하위 호환) 단일 파일 저장 — finalizeMultiDatasetSave로 위임
+ */
+async function finalizeDatasetSave(customName) {
+    await finalizeMultiDatasetSave(false);
 }
 
 /**
@@ -1448,8 +1595,10 @@ function parseExcelData(jsonData, filename) {
     configCard.classList.remove('disabled');
 
     processData(); // processedCycles 배열 구성
-    // 데이터셋 이름 입력 모달을 통해 라이브러리에 저장 후 runAnalysis 호출
-    showDatasetNameModal(filename);
+    // 큐 파싱 중이면 모달 호출을 건너뜁니다 (onQueueFileParsed에서 일괄 처리)
+    if (!_currentQueueFile) {
+        showDatasetNameModal(filename);
+    }
 }
 
 /**
@@ -1599,8 +1748,10 @@ function parseRawText(text, filename, encoding = 'UTF-8') {
     configCard.classList.remove('disabled');
 
     processData(); // processedCycles 배열 구성
-    // 데이터셋 이름 입력 모달을 통해 라이브러리에 저장 후 runAnalysis 호출
-    showDatasetNameModal(filename);
+    // 큐 파싱 중이면 모달 호출을 건너뜁니다 (onQueueFileParsed에서 일괄 처리)
+    if (!_currentQueueFile) {
+        showDatasetNameModal(filename);
+    }
     return true;
 }
 
@@ -8976,35 +9127,116 @@ function generateDemoData() {
    6. Exporting Utilities
    ========================================== */
 function initExportFeatures() {
-    // 1st cycle profile download
+    // 1차 사이클 프로파일 다운로드
     btnDownloadProfile.addEventListener('click', () => {
         if (rawBatteryData.length === 0) return;
         downloadChartImage(chartProfileInstance, 'voltage_profile_cycle_' + targetCycleSelect.value);
     });
 
-    // Slope plateau highlight chart download
+    // Slope/Plateau 하이라이트 차트 다운로드
     btnDownloadSlopeChart.addEventListener('click', () => {
         if (rawBatteryData.length === 0) return;
         downloadChartImage(chartSlopePlateauInstance, 'slope_plateau_analysis');
     });
 
-    // Export cleaned rate capability summary to CSV
+    // 정제된 C-rate 율속 요약 데이터를 엑셀로 내보내기
     btnDownloadRateData.addEventListener('click', () => {
         if (rateCapabilitySummary.length === 0) return;
         
-        let csv = "C-rate,Cycle Range,Avg Charge Capacity (mAh/g),Retention (%),Avg Coulombic Efficiency (%)\n";
+        // 데이터 배열 생성
+        const data = [
+            ["C-rate", "Cycle Range", "Avg Charge Capacity (mAh/g)", "Retention (%)", "Avg Coulombic Efficiency (%)"]
+        ];
+        
         rateCapabilitySummary.forEach(row => {
-            csv += `${row.rate},${row.cycleRange},${row.avgCharge.toFixed(2)},${row.retention.toFixed(2)},${row.avgCE.toFixed(2)}\n`;
+            data.push([
+                row.rate,
+                row.cycleRange,
+                parseFloat(row.avgCharge.toFixed(2)),
+                parseFloat(row.retention.toFixed(2)),
+                parseFloat(row.avgCE.toFixed(2))
+            ]);
         });
 
-        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+        // 엑셀 워크시트 및 워크북 생성
+        const worksheet = XLSX.utils.aoa_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Rate Capability Summary");
+
+        // 엑셀 바이너리 파일 데이터 생성
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        
+        // 응답 콘텐츠 타입에 상응하는 엑셀 바이너리 Blob 객체 생성
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        
+        // 오늘 날짜 포맷 (YYYYMMDD) 생성
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const formattedDate = `${yyyy}${mm}${dd}`;
+
+        // a 태그를 생성하여 download 속성을 명시한 후 강제 클릭 유도 (한글명 인코딩 유지)
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute("download", "Rate_Capability_Summary.csv");
+        link.href = url;
+        link.download = `율속요약_분석결과_${formattedDate}.xlsx`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     });
+
+    // 상세 사이클별 피팅 용량 데이터를 엑셀로 내보내기
+    if (btnDownloadRateDetailData) {
+        btnDownloadRateDetailData.addEventListener('click', () => {
+            const cycleNumbers = Object.keys(processedCycles).map(Number).sort((a, b) => a - b);
+            if (cycleNumbers.length === 0) {
+                alert("내보낼 데이터가 없습니다.");
+                return;
+            }
+            
+            // 데이터 배열 생성
+            const data = [
+                ["Cycle", "Charge Capacity (mAh/g)", "Discharge Capacity (mAh/g)"]
+            ];
+            
+            cycleNumbers.forEach(cNum => {
+                const cyc = processedCycles[cNum];
+                const chargeCap = cyc ? parseFloat(cyc.totalChargeCap.toFixed(2)) : 0;
+                const dischargeCap = cyc ? parseFloat(cyc.totalDischargeCap.toFixed(2)) : 0;
+                data.push([cNum, chargeCap, dischargeCap]);
+            });
+
+            // 엑셀 워크시트 및 워크북 생성
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Rate Capability Detail");
+
+            // 엑셀 바이너리 파일 데이터 생성
+            const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            
+            // 응답 콘텐츠 타입에 상응하는 엑셀 바이너리 Blob 객체 생성
+            const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            
+            // 오늘 날짜 포맷 (YYYYMMDD) 생성
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const formattedDate = `${yyyy}${mm}${dd}`;
+
+            // a 태그를 생성하여 download 속성을 명시한 후 강제 클릭 유도 (한글명 인코딩 유지)
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `상세용량_분석결과_${formattedDate}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
+    }
 }
 
 function downloadChartImage(chartInstance, filename) {
@@ -9484,21 +9716,55 @@ function exportGittCsv() {
         return;
     }
 
-    let csvContent = "\uFEFF";
-    csvContent += "Mode,PulseNo,E0_V,E_tau_V,E_eq_OCV_V,dEt_V,dEs_V,D_cm2_s,log10D\n";
+    // 데이터 배열 생성
+    const data = [
+        ["Mode", "PulseNo", "E0_V", "E_tau_V", "E_eq_OCV_V", "dEt_V", "dEs_V", "D_cm2_s", "log10D"]
+    ];
 
     gittResults.forEach(r => {
-        csvContent += `${r.mode},${r.pulseNo},${r.E0},${r.E_tau},${r.E_eq},${r.dEt},${r.dEs},${r.D.toExponential(6)},${r.logD.toFixed(4)}\n`;
+        data.push([
+            r.mode,
+            r.pulseNo,
+            r.E0,
+            r.E_tau,
+            r.E_eq,
+            r.dEt,
+            r.dEs,
+            r.D,
+            r.logD
+        ]);
     });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // 엑셀 워크시트 및 워크북 생성
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "GITT Results");
+
+    // 엑셀 바이너리 파일 데이터 생성
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    
+    // 응답 콘텐츠 타입에 상응하는 엑셀 바이너리 Blob 객체 생성
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+    // 오늘 날짜 포맷 (YYYYMMDD) 생성
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const formattedDate = `${yyyy}${mm}${dd}`;
+
+    const cleanFilename = activeFilename.textContent.replace(/\.[^.]+$/, '').trim();
+    const downloadName = `GITT결과_${cleanFilename}_${formattedDate}.xlsx`;
+
+    // a 태그를 생성하여 download 속성을 명시한 후 강제 클릭 유도 (한글명 인코딩 유지)
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `GITT_Diffusion_Results_${activeFilename.textContent.replace(/\.[^.]+$/, '')}.csv`);
+    link.href = url;
+    link.download = downloadName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 }
 
 function parseGittExcelData(jsonData, filename) {

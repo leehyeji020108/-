@@ -39,9 +39,10 @@
                 <h2 class="card-title"><span class="material-icons-round icon-align">upload_file</span> 데이터 업로드</h2>
                 <div class="drop-zone" id="dropZone">
                     <span class="material-icons-round drop-icon">cloud_upload</span>
-                    <p class="drop-text">CSV, TXT 또는 Excel 파일을 여기에 드래그하거나 클릭하여 업로드하세요.</p>
+                    <p class="drop-text">CSV, TXT, Excel 파일을 드래그하거나 클릭하세요.</p>
+                    <p class="drop-text" style="font-size:10px; margin-top:4px; color:rgba(255,255,255,0.35);">여러 파일을 한 번에 선택할 수 있습니다</p>
                 </div>
-                <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" hidden>
+                <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" multiple hidden>
 
                 <!-- 율속 테스트 설정 패널 -->
                 <div class="rate-config-panel" id="rateConfigPanel" style="margin-top: 18px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 14px;">
@@ -340,9 +341,12 @@
                     <div class="dashboard-chart-card table-card">
                         <div class="card-header">
                             <h3 class="chart-title">C-rate 율속 데이터 요약</h3>
-                            <div class="header-controls">
+                            <div class="header-controls" style="display: flex; gap: 8px;">
                                 <button class="btn btn-secondary btn-sm" id="btnDownloadRateData">
-                                    <span class="material-icons-round">download</span> CSV 내보내기
+                                    <span class="material-icons-round">download</span> 요약 엑셀 내보내기
+                                </button>
+                                <button class="btn btn-secondary btn-sm" id="btnDownloadRateDetailData">
+                                    <span class="material-icons-round">download</span> 상세 엑셀 내보내기
                                 </button>
                             </div>
                         </div>
@@ -450,24 +454,20 @@
         </main>
     </div>
     
-    <!-- 데이터명 입력 모달 -->
+    <!-- 데이터명 입력 모달 (다중 파일 지원) -->
     <div class="modal-overlay" id="datasetNameModal" style="display:none;">
-        <div class="modal-box">
+        <div class="modal-box" style="max-width: 520px; width: 92%;">
             <div class="modal-header">
                 <span class="material-icons-round" style="color: var(--color-primary);">save</span>
-                <h3>데이터셋 저장</h3>
+                <h3 id="modalTitle">데이터셋 저장</h3>
             </div>
-            <p class="modal-desc">업로드된 파일을 라이브러리에 저장합니다.<br>구분하기 쉽도록 이름을 입력하세요.</p>
-            <div class="modal-file-info" id="modalFileInfo">
-                <span class="material-icons-round" style="font-size:14px;">description</span>
-                <span id="modalFilename">파일명</span>
-            </div>
-            <div style="margin-bottom: 14px;">
-                <label style="font-size: 11px; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">데이터셋 이름</label>
-                <input type="text" id="datasetNameInput" class="modal-input" placeholder="예: HC-Glu-1500°C, 실험세트A...">
-            </div>
+            <p class="modal-desc" id="modalDesc">업로드된 파일을 라이브러리에 저장합니다.<br>구분하기 쉽도록 이름을 입력하세요.</p>
+
+            <!-- 다중 파일 이름 목록 (JS가 동적으로 채워줌) -->
+            <div id="multiFileNameList" style="display:flex; flex-direction:column; gap:10px; max-height:320px; overflow-y:auto; margin-bottom:16px;"></div>
+
             <div class="modal-actions">
-                <button class="btn btn-secondary" id="btnModalSkip">건너뛰기</button>
+                <button class="btn btn-secondary" id="btnModalSkip">건너뛰기 (파일명 사용)</button>
                 <button class="btn btn-primary" id="btnModalSave">
                     <span class="material-icons-round" style="font-size:16px;">save</span> 저장하기
                 </button>
