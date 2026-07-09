@@ -84,63 +84,7 @@
 
             </div>
 
-            <!-- Configuration Card (Hidden from UI but kept in DOM to prevent JS errors) -->
-            <div class="sidebar-card config-card disabled" id="configCard" style="display: none;">
-                <h2 class="card-title"><span class="material-icons-round icon-align">settings</span> 분석 설정</h2>
-                
-                <!-- Column Mapping -->
-                <div class="config-group">
-                    <label class="config-label">칼럼 매핑 (Column Mapping)</label>
-                    <div class="mapping-grid">
-                        <div class="mapping-item">
-                            <span class="mapping-tag">사이클</span>
-                            <select id="mapCycle" class="select-field"></select>
-                        </div>
-                        <div class="mapping-item">
-                            <span class="mapping-tag">전압 (V)</span>
-                            <select id="mapVoltage" class="select-field"></select>
-                        </div>
-                        <div class="mapping-item">
-                            <span class="mapping-tag">용량 (mAh/g)</span>
-                            <select id="mapCapacity" class="select-field"></select>
-                        </div>
-                        <div class="mapping-item">
-                            <span class="mapping-tag">전류 (mA)</span>
-                            <select id="mapCurrent" class="select-field"></select>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Cut-off Voltage Slider -->
-                <div class="config-group">
-                    <div class="label-with-value">
-                        <label class="config-label" for="cutoffVoltageSidebar">Plateau 분리 전압 (Cut-off)</label>
-                        <span class="value-display" id="cutoffValDisplaySidebar">0.10 V</span>
-                    </div>
-                    <input type="range" id="cutoffVoltageSidebar" min="0.02" max="0.30" step="0.01" value="0.10" class="range-slider">
-                    <span class="input-desc">이 전압 이하의 영역을 평탄(Plateau) 영역으로 계산합니다.</span>
-                </div>
-
-                <!-- Analysis Target Cycle -->
-                <div class="config-group">
-                    <label class="config-label" for="targetCycleSidebar">분석 대상 사이클</label>
-                    <select id="targetCycleSidebar" class="select-field">
-                        <option value="1">1 Cycle</option>
-                    </select>
-                </div>
-
-                <!-- C-rate Step Size -->
-                <div class="config-group">
-                    <label class="config-label" for="rateStepSizeSidebar">C-rate 분석 단위</label>
-                    <select id="rateStepSizeSidebar" class="select-field">
-                        <option value="auto" selected>자동 감지</option>
-                        <option value="3">3 사이클 단위</option>
-                        <option value="5">5 사이클 단위</option>
-                        <option value="10">10 사이클 단위</option>
-                    </select>
-                    <span class="input-desc">각 C-rate 단계당 수행된 사이클 수입니다.</span>
-                </div>
-            </div>
             
             <!-- 데이터 라이브러리 패널 -->
             <div class="sidebar-card library-card" id="datasetLibraryCard">
@@ -184,7 +128,7 @@
                     <button class="tab-btn" data-tab="tab-dqdv">
                         <span class="material-icons-round">waves</span> dQ/dV 분석
                     </button>
-                    <button class="tab-btn tab-btn-coming-soon" id="btnGittComingSoon" onclick="window.open('gitt.html', '_blank')">
+                    <button class="tab-btn tab-btn-coming-soon" id="btnGittComingSoon">
                         <span class="material-icons-round">bolt</span> GITT 분석
                         <span class="coming-soon-badge">SOON</span>
                     </button>
@@ -202,13 +146,46 @@
                             <div class="card-header">
                                 <h3 class="chart-title">전압 프로파일 (Voltage Profile)</h3>
                                 <div class="header-controls">
+                                    <!-- 기존 targetCycle 셀렉터는 호환성을 위해 display:none 상태로 남겨둠 -->
+                                    <select id="targetCycle" style="display: none;">
+                                        <option value="1">1 Cycle</option>
+                                    </select>
+                                    <div class="control-item profile-dropdown-container">
+                                        <label style="font-weight: 600; font-size: 11px; color: var(--text-muted);">분석 사이클:</label>
+                                        <button class="inline-select dropdown-toggle-btn" id="btnProfileCycleDropdown" style="display: inline-flex; align-items: center; gap: 8px;">
+                                            <span id="profileCycleSummary">전체 사이클</span>
+                                            <span class="material-icons-round dropdown-arrow-icon" style="font-size: 16px;">arrow_drop_down</span>
+                                        </button>
+                                        
+                                        <!-- 드롭다운 팝오버 패널 -->
+                                        <div class="profile-dropdown-panel" id="profileCycleDropdownPanel">
+                                            <div class="dropdown-header-row">
+                                                <span class="panel-title">사이클 다중 선택</span>
+                                                <div class="cycle-quick-actions" id="profileCycleQuickActions">
+                                                    <button class="btn btn-secondary btn-xs" id="btnProfileCycleAll">전체</button>
+                                                    <button class="btn btn-secondary btn-xs" id="btnProfileCycleClear">해제</button>
+                                                    <button class="btn btn-secondary btn-xs" id="btnProfileCycleOdd">홀수</button>
+                                                    <button class="btn btn-secondary btn-xs" id="btnProfileCycleEven">짝수</button>
+                                                </div>
+                                            </div>
+                                            <div class="cycle-chips-container drag-select-zone" id="profileCycleChipsContainer">
+                                                <!-- JS 동적 생성 영역 -->
+                                            </div>
+                                            <div class="dropdown-footer-tip">
+                                                * Shift+클릭: 범위 선택 | 드래그: 연속 선택/해제
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="control-item">
-                                        <label for="targetCycle">분석 사이클:</label>
-                                        <select id="targetCycle" class="select-field inline-select">
-                                            <option value="1">1 Cycle</option>
+                                        <label for="targetDirectionProfile">표시 방향:</label>
+                                        <select id="targetDirectionProfile" class="select-field inline-select">
+                                            <option value="all" selected>전체 표시</option>
+                                            <option value="discharge">방전만</option>
+                                            <option value="charge">충전만</option>
                                         </select>
                                     </div>
-                                    <button class="btn-icon" title="데이터 다운로드" id="btnDownloadProfile"><span class="material-icons-round">download</span></button>
+                                    <button class="btn-icon" title="차트 이미지 다운로드" id="btnDownloadProfile"><span class="material-icons-round">image</span></button>
+                                    <button class="btn-icon" title="현재 표시 데이터 엑셀 다운로드" id="btnDownloadProfileExcel"><span class="material-icons-round">table_view</span></button>
                                 </div>
                             </div>
                             <div class="chart-container">
@@ -476,6 +453,6 @@
     </div>
 
     <!-- Code Script with Cache Busting -->
-    <script src="app.js?v=2.9.0"></script>
+    <script src="app.js?v=2.9.5"></script>
 </body>
 </html>
