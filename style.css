@@ -1463,4 +1463,328 @@ select option {
     user-select: none !important;
 }
 
+/* ============================================
+   데이터 라이브러리 개편 및 테이블 / 카드 신규 스타일
+   ============================================ */
 
+/* 1. 라이브러리 필터 칩 */
+.library-filter-chips .chip {
+    transition: all 0.2s ease;
+}
+.library-filter-chips .chip.active {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: #fff !important;
+    font-weight: 600;
+}
+.library-filter-chips .chip:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #fff !important;
+}
+
+/* 2. 컨텍스트 메뉴 (더보기 메뉴) */
+.dataset-item {
+    position: relative; /* 컨텍스트 메뉴 기준점 */
+}
+
+.ds-more-menu-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+}
+
+.ds-more-menu-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.ds-context-menu {
+    position: fixed;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6);
+    z-index: 9999;
+    min-width: 150px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 4px 0;
+    display: none;
+    flex-direction: column;
+}
+
+/* 인라인 에디트 아이콘 */
+.ds-inline-edit-icon {
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.2s, color 0.2s;
+    margin-left: 6px;
+    vertical-align: middle;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ds-inline-edit-icon:hover {
+    opacity: 1;
+    color: var(--color-primary);
+}
+
+.ds-context-menu.show {
+    display: flex;
+}
+
+.ds-context-menu-item {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    padding: 8px 14px;
+    font-size: 11px;
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.ds-context-menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: var(--color-primary);
+}
+
+.ds-context-menu-item.danger:hover {
+    color: var(--color-danger);
+}
+
+/* 3. 테이블 스타일 */
+.lib-data-table {
+    border-collapse: collapse;
+    width: 100%;
+    color: var(--text-main);
+}
+
+.lib-data-table th, 
+.lib-data-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.lib-data-table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.lib-data-table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* 4. 상태 뱃지 스타일 */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.status-badge.status-pending {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+}
+
+.status-badge.status-converting {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: var(--color-primary);
+    animation: statusPulse 1.5s infinite ease-in-out;
+}
+
+.status-badge.status-converted {
+    background-color: rgba(16, 185, 129, 0.15);
+    color: var(--color-success);
+}
+
+.status-badge.status-failed {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: var(--color-danger);
+}
+
+.status-badge.status-updated {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: var(--color-orange);
+}
+
+@keyframes statusPulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+/* 5. 데이터 라이브러리 탭 테이블 내 액션 버튼 */
+.btn-table-action {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.btn-table-action:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+/* 6. 수동 업로드 접이식 보정 */
+.manual-upload-accordion summary::-webkit-details-marker {
+    display: none;
+}
+.manual-upload-accordion[open] summary span.material-icons-round {
+    transform: rotate(180deg);
+}
+.manual-upload-accordion summary span.material-icons-round {
+    transition: transform 0.2s ease;
+}
+
+/* 7. 데이터 라이브러리 아코디언 그룹화 스타일 */
+.sample-group-container {
+    margin-bottom: 12px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+}
+
+.sample-group-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s;
+    gap: 8px;
+}
+
+.sample-group-header:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sample-group-header .group-color-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.sample-group-header .sample-name-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-grow: 1;
+}
+
+.sample-group-header .sample-count-badge {
+    font-size: 9px;
+    color: var(--text-muted);
+    background: rgba(0,0,0,0.2);
+    padding: 1px 5px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.sample-group-header .expand-icon {
+    font-size: 16px;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+}
+
+.sample-group-header.collapsed .expand-icon {
+    transform: rotate(-90deg);
+}
+
+.sample-group-content {
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sample-group-content.collapsed {
+    display: none;
+}
+
+/* X 삭제 버튼 스타일 */
+.ds-delete-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, background-color 0.2s;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.ds-delete-btn:hover {
+    color: var(--color-danger, #f87171);
+    background-color: rgba(248, 113, 113, 0.15);
+}
+
+/* 인라인 편집 패널 (ponytail: 최소 CSS, 기존 변수 재사용) */
+.inline-edit-wrap { position: relative; display: flex; align-items: center; gap: 6px; }
+.inline-edit-wrap input {
+    flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px; color: #fff; padding: 4px 8px; font-size: 13px; min-width: 0;
+}
+.inline-edit-wrap input:focus { outline: none; border-color: var(--color-primary, #60a5fa); }
+.inline-select-panel {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
+    background: var(--bg-card, #1e2738); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; padding: 6px; min-width: 180px; max-height: 240px;
+    overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.inline-select-panel .isp-item {
+    padding: 6px 10px; border-radius: 5px; cursor: pointer; font-size: 13px; color: #e2e8f0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inline-select-panel .isp-item:hover { background: rgba(255,255,255,0.1); }
+.inline-select-panel .isp-item.active { color: var(--color-primary, #60a5fa); font-weight: 600; }
+.inline-select-panel .isp-new-wrap {
+    display: flex; gap: 4px; margin-top: 4px; padding-top: 4px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+.inline-select-panel .isp-new-wrap input {
+    flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 5px; color: #fff; padding: 4px 7px; font-size: 12px;
+}
+.inline-select-panel .isp-new-wrap input:focus { outline: none; border-color: var(--color-primary,#60a5fa); }

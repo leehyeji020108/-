@@ -34,70 +34,127 @@
             
             <p class="sidebar-subtitle">배터리 논문 투고용 전기화학 데이터 정제 시스템</p>
 
-            <!-- File Upload Card -->
-            <div class="sidebar-card upload-card">
-                <h2 class="card-title"><span class="material-icons-round icon-align">upload_file</span> 데이터 업로드</h2>
-                <div class="drop-zone" id="dropZone">
-                    <span class="material-icons-round drop-icon">cloud_upload</span>
-                    <p class="drop-text">CSV, TXT, Excel 파일을 드래그하거나 클릭하세요.</p>
-                    <p class="drop-text" style="font-size:10px; margin-top:4px; color:rgba(255,255,255,0.35);">여러 파일을 한 번에 선택할 수 있습니다</p>
+            <!-- File Update Card -->
+            <div class="sidebar-card upload-card" id="dataUpdateCard">
+                <h2 class="card-title"><span class="material-icons-round icon-align">sync</span> 데이터 업데이트</h2>
+                
+                <!-- Project Selection & Management -->
+                <div class="project-config-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 11px; color: var(--text-muted); font-weight: 500; display: block; margin-bottom: 6px;">프로젝트 선택</label>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <select id="projectSelect" class="select-field" style="margin-bottom: 0; flex: 1; height: 32px; font-size: 12px;"></select>
+                        <button id="btnAddProject" class="btn btn-secondary btn-icon" title="프로젝트 추가" style="height: 32px; width: 32px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                            <span class="material-icons-round" style="font-size: 16px;">add</span>
+                        </button>
+                        <button id="btnRenameProject" class="btn btn-secondary btn-icon" title="프로젝트 수정" style="height: 32px; width: 32px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                            <span class="material-icons-round" style="font-size: 16px;">edit</span>
+                        </button>
+                    </div>
                 </div>
-                <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" multiple hidden>
 
-                <!-- 율속 테스트 설정 패널 -->
-                <div class="rate-config-panel" id="rateConfigPanel" style="margin-top: 18px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 14px;">
-                    <p class="rate-config-title" style="font-size: 11px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 10px;">⚡ 율속 분석 설정</p>
+                <!-- Update Buttons -->
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <button id="btnUpdateData" class="btn btn-primary" style="flex: 1; height: 32px; font-size: 12px; font-weight: 600; padding: 0 10px;">
+                        <span class="material-icons-round" style="font-size:16px; vertical-align:middle; margin-right:4px;">refresh</span>업데이트
+                    </button>
+                    <button id="btnSimulateFailure" class="btn btn-secondary" style="height: 32px; font-size: 11px; padding: 0 8px;" title="실패 시뮬레이션">
+                        실패 테스트
+                    </button>
+                </div>
 
-                    <!-- 단위 선택 (C-rate vs mA/g) -->
-                    <div style="margin-bottom: 10px;">
-                        <label style="font-size: 11px; color: var(--text-muted); font-weight: 500; display: block; margin-bottom: 6px;">측정 단위</label>
-                        <div class="rate-unit-toggle" id="rateUnitToggle">
-                            <button class="rate-unit-btn active" data-unit="crate" id="btnUnitCrate">C-rate</button>
-                            <button class="rate-unit-btn" data-unit="mag" id="btnUnitMag">mA/g</button>
+                <!-- Update Status Area -->
+                <div class="update-status-panel" style="background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 8px 10px; margin-bottom: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted);">
+                        <span>상태:</span>
+                        <span id="updateStatusText" style="font-weight: 600; color: var(--color-primary);">대기 중</span>
+                    </div>
+                </div>
+
+                <!-- 수동 업로드 모드 접이식 영역 -->
+                <details class="manual-upload-accordion" id="manualUploadAccordion" style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 10px;">
+                    <summary style="font-size: 11px; color: var(--text-muted); font-weight: 600; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; outline: none; margin-bottom: 10px;">
+                        <span>🔧 수동 업로드 모드</span>
+                        <span class="material-icons-round" style="font-size: 14px;">expand_more</span>
+                    </summary>
+                    <div class="drop-zone" id="dropZone" style="margin-top: 6px;">
+                        <span class="material-icons-round drop-icon">cloud_upload</span>
+                        <p class="drop-text">CSV, TXT, Excel 파일을 드래그하거나 클릭하세요.</p>
+                        <p class="drop-text" style="font-size:10px; margin-top:4px; color:rgba(255,255,255,0.35);">여러 파일을 한 번에 선택할 수 있습니다</p>
+                    </div>
+                    <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" multiple hidden>
+
+                    <!-- 율속 테스트 설정 패널 -->
+                    <div class="rate-config-panel" id="rateConfigPanel" style="margin-top: 10px; padding-top: 8px;">
+                        <p class="rate-config-title" style="font-size: 10px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px;">⚡ 율속 분석 설정</p>
+
+                        <!-- 단위 선택 (C-rate vs mA/g) -->
+                        <div style="margin-bottom: 8px;">
+                            <label style="font-size: 10px; color: var(--text-muted); font-weight: 500; display: block; margin-bottom: 4px;">측정 단위</label>
+                            <div class="rate-unit-toggle" id="rateUnitToggle" style="height: 24px;">
+                                <button class="rate-unit-btn active" data-unit="crate" id="btnUnitCrate" style="font-size: 9px; padding: 2px 6px;">C-rate</button>
+                                <button class="rate-unit-btn" data-unit="mag" id="btnUnitMag" style="font-size: 9px; padding: 2px 6px;">mA/g</button>
+                            </div>
+                        </div>
+
+                        <!-- 단계당 사이클 수 -->
+                        <div style="margin-bottom: 8px;">
+                            <label class="config-label" for="rateStepSize" style="margin-bottom: 4px; display: block; font-size: 10px; color: var(--text-muted); font-weight: 500;">단계당 사이클 수</label>
+                            <select id="rateStepSize" class="select-field" style="height: 26px; font-size: 10px; padding: 0 4px;">
+                                <option value="3">3 사이클</option>
+                                <option value="5" selected>5 사이클 (표준)</option>
+                                <option value="10">10 사이클</option>
+                            </select>
+                        </div>
+
+                        <!-- 단계 라벨 직접 입력 -->
+                        <div>
+                            <label class="config-label" for="rateStepsInput" style="margin-bottom: 4px; display: block; font-size: 10px; color: var(--text-muted); font-weight: 500;">
+                                <span id="rateStepsLabel">단계별 C-rate 값</span>
+                            </label>
+                            <input type="text" id="rateStepsInput" class="select-field"
+                                value="0.1, 0.2, 0.5, 1, 2, 5, 10, 0.1"
+                                placeholder="예: 0.1, 0.2, 0.5, 1, 2..."
+                                style="padding: 4px 6px; height: 26px; font-size: 10px;">
                         </div>
                     </div>
-
-                    <!-- 단계당 사이클 수 -->
-                    <div style="margin-bottom: 10px;">
-                        <label class="config-label" for="rateStepSize" style="margin-bottom: 6px; display: block; font-size: 11px; color: var(--text-muted); font-weight: 500;">단계당 사이클 수</label>
-                        <select id="rateStepSize" class="select-field">
-                            <option value="3">3 사이클</option>
-                            <option value="5" selected>5 사이클 (표준)</option>
-                            <option value="10">10 사이클</option>
-                        </select>
-                    </div>
-
-                    <!-- 단계 라벨 직접 입력 -->
-                    <div>
-                        <label class="config-label" for="rateStepsInput" style="margin-bottom: 6px; display: block; font-size: 11px; color: var(--text-muted); font-weight: 500;">
-                            <span id="rateStepsLabel">단계별 C-rate 값</span> <span style="color: var(--color-accent); font-size: 9px;">(쉼표 구분)</span>
-                        </label>
-                        <input type="text" id="rateStepsInput" class="select-field"
-                            value="0.1, 0.2, 0.5, 1, 2, 5, 10, 0.1"
-                            placeholder="예: 0.1, 0.2, 0.5, 1, 2..."
-                            style="padding: 8px 10px; height: auto; font-size: 11px;">
-                        <span style="margin-top: 4px; display: block; font-size: 9px; color: var(--text-muted);">
-                            각 율속 단계의 값을 순서대로 입력 (숫자만)
-                        </span>
-                    </div>
-                </div>
-
+                </details>
             </div>
 
 
             
             <!-- 데이터 라이브러리 패널 -->
             <div class="sidebar-card library-card" id="datasetLibraryCard">
-                <div class="library-card-header">
-                    <h2 class="card-title" style="margin: 0;">
+                <div class="library-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 class="card-title" style="margin: 0; display: inline-flex; align-items: center; gap: 4px;">
                         <span class="material-icons-round icon-align">dataset</span>
                         데이터 라이브러리
                     </h2>
-                    <span class="library-count-badge" id="libraryCountBadge">0</span>
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                        <button id="btnEnableDemoMode" class="btn btn-secondary btn-xs" style="font-size: 9px; padding: 2px 6px;" title="데모 데이터 생성">Demo</button>
+                        <span class="library-count-badge" id="libraryCountBadge">0</span>
+                    </div>
                 </div>
-                <p style="font-size: 10px; color: var(--text-muted); margin: 6px 0 10px; line-height: 1.4;">
-                    저장된 데이터를 체크하면 모든 탭에서 비교 오버레이됩니다.
-                </p>
+                
+                <!-- 요약 정보 영역 -->
+                <div class="library-summary-panel" style="font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.12); border-radius: 4px; padding: 6px 8px; margin: 8px 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;">
+                    <div>전체: <span id="summaryTotal" style="color: #fff; font-weight: 600;">0</span></div>
+                    <div>완료: <span id="summaryCompleted" style="color: var(--color-success); font-weight: 600;">0</span></div>
+                    <div>실패: <span id="summaryFailed" style="color: var(--color-danger); font-weight: 600;">0</span></div>
+                    <div>업데이트 필요: <span id="summaryNeedUpdate" style="color: var(--color-orange); font-weight: 600;">0</span></div>
+                    <div style="grid-column: span 2; font-size: 9px; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 4px; margin-top: 2px;">
+                        마지막 업데이트: <span id="summaryLastTime">-</span>
+                    </div>
+                </div>
+                <!-- 필터 칩 영역 -->
+                <div class="library-filter-chips" style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px;">
+                    <button class="chip active" data-filter="all" style="font-size: 9px; padding: 3px 6px; border: 1px solid rgba(255,255,255,0.15); background: transparent; border-radius: 4px; color: var(--text-muted); cursor: pointer;">전체</button>
+                    <button class="chip" data-filter="rate" style="font-size: 9px; padding: 3px 6px; border: 1px solid rgba(255,255,255,0.15); background: transparent; border-radius: 4px; color: var(--text-muted); cursor: pointer;">Rate</button>
+                    <button class="chip" data-filter="cycle_performance" style="font-size: 9px; padding: 3px 6px; border: 1px solid rgba(255,255,255,0.15); background: transparent; border-radius: 4px; color: var(--text-muted); cursor: pointer;">Cycle</button>
+                    <button class="chip" data-filter="gitt" style="font-size: 9px; padding: 3px 6px; border: 1px solid rgba(255,255,255,0.15); background: transparent; border-radius: 4px; color: var(--text-muted); cursor: pointer;">GITT</button>
+                    <button class="chip" data-filter="cv" style="font-size: 9px; padding: 3px 6px; border: 1px solid rgba(255,255,255,0.15); background: transparent; border-radius: 4px; color: var(--text-muted); cursor: pointer;">CV</button>
+                    <button class="chip" data-filter="failed" style="font-size: 9px; padding: 3px 6px; border: 1px solid var(--color-danger); background: transparent; border-radius: 4px; color: var(--color-danger); cursor: pointer;">실패</button>
+                </div>
+
                 <div class="dataset-list" id="datasetList">
                     <p class="library-empty-msg">업로드한 데이터가 여기에 저장됩니다.</p>
                 </div>
@@ -116,6 +173,9 @@
                     <h2 class="active-filename" id="activeFilename">분석할 데이터를 업로드해 주세요</h2>
                 </div>
                 <div class="header-tabs">
+                    <button class="tab-btn" data-tab="tab-library" id="btnTabLibrary">
+                        <span class="material-icons-round">folder_open</span> 데이터 라이브러리
+                    </button>
                     <button class="tab-btn active" data-tab="tab-overview">
                         <span class="material-icons-round">dashboard</span> 개요 & ICE
                     </button>
@@ -138,6 +198,75 @@
             <!-- Dashboard Content Panels -->
             <div class="content-body">
                 <div id="welcomeView" style="display: none;"></div>
+
+                <!-- Tab 0: Data Library -->
+                <div class="tab-panel" id="tab-library">
+                    <div class="library-tab-container" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
+                        <!-- 검색 및 필터 헤더 -->
+                        <div class="library-tab-filter-bar" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px; position: relative;">
+                                <span class="material-icons-round" style="position: absolute; left: 10px; top: 8px; color: var(--text-muted); font-size: 18px;">search</span>
+                                <input type="text" id="libTabSearch" class="select-field" placeholder="데이터명, 샘플명, 원본 파일명 검색..." style="padding-left: 34px; margin-bottom: 0; width: 100%; height: 34px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <select id="libTabProjectFilter" class="select-field" style="margin-bottom: 0; height: 34px; width: 140px; box-sizing: border-box;"></select>
+                            </div>
+                            <div>
+                                <select id="libTabTypeFilter" class="select-field" style="margin-bottom: 0; height: 34px; width: 140px; box-sizing: border-box;">
+                                    <option value="all">모든 실험 타입</option>
+                                    <option value="rate">Rate</option>
+                                    <option value="cycle_performance">Cycle performance</option>
+                                    <option value="gitt">GITT</option>
+                                    <option value="cv">CV</option>
+                                </select>
+                            </div>
+                            <div>
+                                <select id="libTabStatusFilter" class="select-field" style="margin-bottom: 0; height: 34px; width: 120px; box-sizing: border-box;">
+                                    <option value="all">모든 상태</option>
+                                    <option value="converted">완료</option>
+                                    <option value="failed">실패</option>
+                                    <option value="pending">대기 중</option>
+                                    <option value="converting">변환 중</option>
+                                    <option value="updated">업데이트됨</option>
+                                </select>
+                            </div>
+                            <div>
+                                <select id="libTabSort" class="select-field" style="margin-bottom: 0; height: 34px; width: 120px; box-sizing: border-box;">
+                                    <option value="newest">최신순 정렬</option>
+                                    <option value="name">이름순 정렬</option>
+                                    <option value="type">타입순 정렬</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 전체 데이터 테이블 카드 -->
+                        <div class="dashboard-chart-card" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+                            <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding: 12px 16px;">
+                                <h3 class="chart-title" style="margin:0;">종합 데이터 리스트</h3>
+                            </div>
+                            <div style="flex: 1; overflow-y: auto;">
+                                <table class="lib-data-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
+                                    <thead style="background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;">
+                                        <tr>
+                                            <th style="padding: 12px 16px; color: var(--text-muted); width: 60px;">표시</th>
+                                            <th style="padding: 12px 16px; color: var(--text-muted);">Data Name</th>
+                                            <th style="padding: 12px 16px; color: var(--text-muted);">Sample</th>
+                                            <th style="padding: 12px 16px; color: var(--text-muted);">Project</th>
+                                            <th style="padding: 12px 16px; color: var(--text-muted);">Experiment Type</th>
+                                            <th style="padding: 12px 16px; color: var(--text-muted);">Status</th>
+                                            <th style="padding: 12px 16px; color: var(--text-muted);">Key Metric</th>
+                                            <th style="padding: 12px 16px; color: var(--text-muted);">Updated</th>
+                                            <th style="padding: 12px 16px; text-align: right; color: var(--text-muted);">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="libTableBody">
+                                        <!-- JS 동적 생성 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Tab 1: Overview & ICE -->
                 <div class="tab-panel active" id="tab-overview">
