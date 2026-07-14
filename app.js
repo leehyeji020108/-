@@ -513,6 +513,8 @@ function initAnalysisControls() {
 
     // 다중 사이클 퀵 필터 바인딩
     initCycleQuickActions();
+    initDqDvCycleDropdown();
+
 
     if (selectDqDvMode) {
         selectDqDvMode.addEventListener('change', () => {
@@ -3961,7 +3963,49 @@ function renderCycleChipsUI() {
 
         container.appendChild(chip);
     });
+
+    updateDqDvCycleSummary();
 }
+
+/**
+ * dQ/dV 드롭다운 토글 버튼 요약 텍스트 갱신
+ */
+function updateDqDvCycleSummary() {
+    const el = document.getElementById('dqdvCycleSummary');
+    if (!el) return;
+    const cycleNumbers = Object.keys(processedCycles).map(Number).sort((a, b) => a - b);
+    const sel = selectedDqDvCycles;
+    if (sel.length === 0 || cycleNumbers.length === 0) {
+        el.textContent = '-';
+    } else if (sel.length === cycleNumbers.length) {
+        el.textContent = '전체 사이클';
+    } else if (sel.length <= 3) {
+        el.textContent = sel.join(', ') + ' Cycle';
+    } else {
+        el.textContent = `${sel[0]}C 외 ${sel.length - 1}개`;
+    }
+}
+
+/**
+ * dQ/dV 사이클 드롭다운 토글 초기화
+ */
+function initDqDvCycleDropdown() {
+    const btn = document.getElementById('btnDqDvCycleDropdown');
+    const panel = document.getElementById('dqdvCycleDropdownPanel');
+    if (!btn || !panel) return;
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        panel.classList.toggle('show');
+    });
+
+    // 패널 내부 클릭은 닫히지 않게
+    panel.addEventListener('click', (e) => e.stopPropagation());
+
+    // 외부 클릭 시 닫기
+    document.addEventListener('click', () => panel.classList.remove('show'));
+}
+
 
 /**
  * 퀵 액션 필터 버튼 이벤트 바인딩

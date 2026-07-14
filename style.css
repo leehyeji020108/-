@@ -331,6 +331,8 @@ body {
     flex-direction: column;
     height: 100vh;
     overflow-y: auto;
+    min-width: 0;
+    overflow-x: hidden;
 }
 
 /* Main Header & Tab Navigation */
@@ -501,6 +503,8 @@ body {
     padding: 28px;
     flex-grow: 1;
     position: relative;
+    min-width: 0;
+    overflow-x: hidden;
 }
 
 /* Welcome View */
@@ -699,6 +703,9 @@ body {
     backdrop-filter: var(--glass-blur);
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .card-header {
@@ -706,6 +713,8 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .chart-title {
@@ -717,7 +726,12 @@ body {
 .chart-container {
     position: relative;
     width: 100%;
+    max-width: 100%;
     height: 380px;
+}
+
+.chart-container canvas {
+    max-width: 100%;
 }
 
 .card-footer-note {
@@ -789,6 +803,9 @@ body {
     display: flex;
     align-items: center;
     gap: 16px;
+    flex-wrap: wrap;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .control-item {
@@ -1263,6 +1280,71 @@ select option {
 .cycle-quick-actions {
     display: flex;
     gap: 4px;
+}
+
+/* ============================================================
+   dQ/dV 사이클 드롭다운 패널
+   ============================================================ */
+.dqdv-dropdown-container {
+    position: relative;
+}
+
+.dropdown-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    height: 32px;
+    padding: 0 8px 0 12px;
+    white-space: nowrap;
+}
+
+.dropdown-toggle-btn .dropdown-arrow-icon {
+    font-size: 18px;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+}
+
+.dqdv-dropdown-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 280px;
+    max-height: 340px;
+    overflow-y: auto;
+    z-index: 1050;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 12px 30px -5px rgba(0,0,0,0.6), 0 8px 12px -6px rgba(0,0,0,0.5);
+    padding: 12px;
+    user-select: none;
+}
+
+.dqdv-dropdown-panel.show {
+    display: block;
+    animation: fadeInDropdown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* dQ/dV 전용 세로 목록 */
+.dqdv-cycle-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    max-height: 240px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-right: 4px;
+}
+
+.dqdv-cycle-list .cycle-chip {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    border-radius: 6px !important;
+    padding: 6px 10px !important;
+    box-sizing: border-box !important;
+    text-align: left !important;
 }
 
 .btn-xs {

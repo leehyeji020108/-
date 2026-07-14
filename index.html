@@ -483,18 +483,25 @@
                                     <select id="targetCycleDqDv" style="display: none;">
                                         <option value="1">1 Cycle</option>
                                     </select>
-                                    <div class="control-item" style="flex: 1; min-width: 250px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-                                        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
-                                            <label style="font-weight: 600; font-size: 11px; color: var(--text-muted);">분석 사이클 선택:</label>
-                                            <div class="cycle-quick-actions" id="cycleQuickActions">
-                                                <button class="btn btn-secondary btn-xs" id="btnCycleAll">전체</button>
-                                                <button class="btn btn-secondary btn-xs" id="btnCycleClear">해제</button>
-                                                <button class="btn btn-secondary btn-xs" id="btnCycleOdd">홀수</button>
-                                                <button class="btn btn-secondary btn-xs" id="btnCycleEven">짝수</button>
+                                    <div class="control-item dqdv-dropdown-container">
+                                        <label style="font-weight: 600; font-size: 11px; color: var(--text-muted); white-space: nowrap;">분석 사이클:</label>
+                                        <button class="inline-select dropdown-toggle-btn" id="btnDqDvCycleDropdown">
+                                            <span id="dqdvCycleSummary">1 Cycle</span>
+                                            <span class="material-icons-round dropdown-arrow-icon">arrow_drop_down</span>
+                                        </button>
+                                        <div class="dqdv-dropdown-panel" id="dqdvCycleDropdownPanel">
+                                            <div class="dropdown-header-row">
+                                                <span class="panel-title">dQ/dV 사이클 선택</span>
+                                                <div class="cycle-quick-actions" id="cycleQuickActions">
+                                                    <button class="btn btn-secondary btn-xs" id="btnCycleAll">전체</button>
+                                                    <button class="btn btn-secondary btn-xs" id="btnCycleClear">해제</button>
+                                                    <button class="btn btn-secondary btn-xs" id="btnCycleOdd">홀수</button>
+                                                    <button class="btn btn-secondary btn-xs" id="btnCycleEven">짝수</button>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div class="cycle-chips-container" id="cycleChipsContainer">
-                                            <!-- JS 동적 생성 영역 -->
+                                            <div class="cycle-chips-container dqdv-cycle-list" id="cycleChipsContainer">
+                                                <!-- JS 동적 생성 영역 -->
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="control-item">
